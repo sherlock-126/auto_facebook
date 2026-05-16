@@ -1,0 +1,17 @@
+[Unit]
+Description=auto_facebook browser stack (Xvfb + x11vnc + websockify)
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/root/.vibedev/repos/auto_facebook
+EnvironmentFile=/root/.vibedev/repos/auto_facebook/.env
+ExecStart=/usr/bin/bash scripts/start-browser-stack.sh
+ExecStop=/usr/bin/bash scripts/stop-browser-stack.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-facebook-stack
+
+[Install]
+WantedBy=multi-user.target

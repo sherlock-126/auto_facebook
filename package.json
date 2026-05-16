@@ -1,0 +1,39 @@
+{
+  "name": "auto_facebook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Facebook joined-groups scraper -> Postgres warehouse (MISA-pattern: noVNC login + XHR discover + GraphQL replay)",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "etl": "tsx src/cli.ts",
+    "scheduler": "tsx src/scheduler.ts",
+    "stack:up": "bash scripts/start-browser-stack.sh",
+    "stack:down": "bash scripts/stop-browser-stack.sh",
+    "db:init": "bash scripts/init-db.sh",
+    "db:migrate": "PGPASSWORD=$(grep ^PG_PASSWORD .env | cut -d= -f2) psql -h $(grep ^PG_HOST .env | cut -d= -f2) -p $(grep ^PG_PORT .env | cut -d= -f2) -U $(grep ^PG_USER .env | cut -d= -f2) -d $(grep ^PG_DATABASE .env | cut -d= -f2) -v ON_ERROR_STOP=1",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/static": "^7.0.4",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.0",
+    "playwright": "^1.48.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

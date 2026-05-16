@@ -1,0 +1,20 @@
+[Unit]
+Description=auto_facebook Fastify server (dashboard + login + discover)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.vibedev/repos/auto_facebook
+EnvironmentFile=/root/.vibedev/repos/auto_facebook/.env
+ExecStart=/usr/bin/npm --silent start
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-facebook
+# Browser stack must be up first (see auto-facebook-stack.service)
+After=auto-facebook-stack.service
+
+[Install]
+WantedBy=multi-user.target

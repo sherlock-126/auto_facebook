@@ -1,0 +1,18 @@
+[Unit]
+Description=auto_facebook node-cron scheduler (ETL ticks)
+After=network.target postgresql.service auto-facebook.service
+Wants=auto-facebook.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.vibedev/repos/auto_facebook
+EnvironmentFile=/root/.vibedev/repos/auto_facebook/.env
+ExecStart=/usr/bin/npm --silent run scheduler
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-facebook-sched
+
+[Install]
+WantedBy=multi-user.target
