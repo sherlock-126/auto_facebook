@@ -59,7 +59,7 @@ export function passwordResetTemplate(args: { email: string; token: string }): {
 }
 
 export function welcomeTemplate(args: { email: string; tenant_id: string; license_key: string }): { subject: string; html: string } {
-  const installCmd = `curl -fsSL ${BASE_URL}/install.sh | LICENSE_KEY=${args.license_key} bash`;
+  const installCmd = `curl -fsSL ${BASE_URL}/install.sh | sudo bash -s ${args.license_key}`;
   return {
     subject: '[nextclaw] Your account is active 🎉',
     html: wrap(

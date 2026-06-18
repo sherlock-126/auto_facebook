@@ -220,7 +220,7 @@ export function renderLanding(): string {
         <div class="tag"><span class="i">&#8623;</span>Install</div>
         <h3>One command on your server</h3>
         <p>The agent installs everything it needs and logs into Facebook once, through a private browser only you can see.</p>
-        <code class="code">curl -fsSL ${INSTALL_HOST}/install.sh \\<br>&nbsp;&nbsp;| LICENSE_KEY=lk_&hellip; bash</code>
+        <code class="code">curl -fsSL ${INSTALL_HOST}/install.sh \\<br>&nbsp;&nbsp;| sudo bash -s lk_&hellip;</code>
       </div>
       <div class="step">
         <div class="tag"><span class="i">&#9651;</span>Catch</div>

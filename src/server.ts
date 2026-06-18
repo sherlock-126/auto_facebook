@@ -3993,7 +3993,7 @@ fetch('/auth/me', { credentials: 'same-origin' })
       }
       // Self-serve token: show this tenant's license + ready-to-paste install command.
       var lk = j.user.license_key || '';
-      var cmd = 'curl -fsSL ' + location.origin + '/install.sh | LICENSE_KEY=' + lk + ' bash';
+      var cmd = 'curl -fsSL ' + location.origin + '/install.sh | sudo bash -s ' + lk;
       document.querySelectorAll('.installCmd').forEach(function(el){ el.textContent = cmd; });
       document.querySelectorAll('.licenseKeyFull').forEach(function(el){ el.textContent = lk; });
     }

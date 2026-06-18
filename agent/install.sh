@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# fb.autonow.vn agent installer (v0.2 — B2 + B3-lite).
+# nextclaw agent installer (v0.2 — B2 + B3-lite).
 #
-# Usage:  curl -fsSL __CLOUD_BASE_URL__/install.sh | LICENSE_KEY=lk_xxx bash
+# Usage:  curl -fsSL __CLOUD_BASE_URL__/install.sh | sudo bash -s lk_xxx
 #
 # Installs:
 #   /opt/auto-facebook-agent/                — agent code (TypeScript via tsx)
@@ -39,25 +39,29 @@ c_blue()   { printf '\033[34m%s\033[0m\n' "$*"; }
 c_yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
 banner()   { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 
-banner "fb.autonow.vn agent installer v0.3 (Lazy+Headless)"
+banner "nextclaw agent installer v0.3 (Lazy+Headless)"
 echo "    cloud:        $CLOUD_BASE_URL"
 echo "    install dir:  $INSTALL_DIR"
 echo "    config:       $CONFIG_FILE"
 echo
 
 # ----- preflight -----
+# Accept the license key from $1 (preferred, sudo-safe) or the LICENSE_KEY env var.
+LICENSE_KEY="${LICENSE_KEY:-${1:-}}"
 if [ "$EUID" -ne 0 ]; then
-  c_red "ERROR: phải chạy bằng root (dùng sudo)."
+  c_red "ERROR: must run as root (use sudo)."
+  echo "Correct one-liner:"
+  echo "  curl -fsSL $CLOUD_BASE_URL/install.sh | sudo bash -s lk_xxx"
   exit 1
 fi
 if [ -z "${LICENSE_KEY:-}" ]; then
-  c_red "ERROR: thiếu env LICENSE_KEY."
-  echo "Cách chạy đúng:"
-  echo "  curl -fsSL $CLOUD_BASE_URL/install.sh | LICENSE_KEY=lk_xxx bash"
+  c_red "ERROR: missing license key."
+  echo "Correct one-liner:"
+  echo "  curl -fsSL $CLOUD_BASE_URL/install.sh | sudo bash -s lk_xxx"
   exit 1
 fi
 if ! command -v apt-get >/dev/null 2>&1; then
-  c_red "ERROR: hệ điều hành không hỗ trợ (cần Ubuntu/Debian)."
+  c_red "ERROR: unsupported OS (requires Ubuntu/Debian)."
   exit 1
 fi
 
@@ -69,23 +73,23 @@ SWAP_MB=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
 TOTAL_MB=$((RAM_MB + SWAP_MB))
 
 if [ "$RAM_MB" -lt 2500 ] && [ "$TOTAL_MB" -lt 5000 ]; then
-  c_red "ERROR: VPS chỉ có ${RAM_MB}MB RAM + ${SWAP_MB}MB swap."
-  echo "Cần tối thiểu 2.5GB RAM HOẶC RAM+swap ≥ 5GB. Aborting."
-  echo "Tip: tạo swap 4GB bằng:"
+  c_red "ERROR: VPS only has ${RAM_MB}MB RAM + ${SWAP_MB}MB swap."
+  echo "Need at least 2.5GB RAM OR RAM+swap >= 5GB. Aborting."
+  echo "Tip: create 4GB swap with:"
   echo "  fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
   exit 1
 elif [ "$RAM_MB" -lt 6000 ] && [ "$SWAP_MB" -lt 2000 ]; then
-  c_yellow "⚠ VPS có ${RAM_MB}MB RAM + ${SWAP_MB}MB swap."
-  echo "  Khuyến nghị: RAM ≥ 6GB HOẶC RAM + swap ≥ 6GB."
-  echo "  Có thể chạy được với Lazy+Headless mode nhưng nên thêm swap."
-  echo "  Đợi 5 giây trước khi tiếp tục (Ctrl+C để hủy)..."
+  c_yellow "WARNING: VPS has ${RAM_MB}MB RAM + ${SWAP_MB}MB swap."
+  echo "  Recommended: RAM >= 6GB OR RAM + swap >= 6GB."
+  echo "  Lazy+Headless mode can run on this, but adding swap is advised."
+  echo "  Waiting 5 seconds before continuing (Ctrl+C to cancel)..."
   sleep 5
 else
-  c_green "✓ RAM: ${RAM_MB}MB + swap: ${SWAP_MB}MB"
+  c_green "OK RAM: ${RAM_MB}MB + swap: ${SWAP_MB}MB"
 fi
 
 # ----- base deps -----
-banner "Cài dependencies cơ bản (curl, jq, openssl)"
+banner "Installing base dependencies (curl, jq, openssl)"
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates tar jq openssl >/dev/null
 
@@ -95,58 +99,58 @@ if command -v node >/dev/null 2>&1; then
   CUR_MAJOR=$(node --version | sed -E 's/^v([0-9]+).*/\1/')
   if [ "$CUR_MAJOR" -ge 20 ] 2>/dev/null; then
     NEED_NODE=false
-    c_green "✓ Node.js $(node --version) đã cài sẵn"
+    c_green "OK Node.js $(node --version) already installed"
   else
-    c_yellow "⚠ Node.js $(node --version) quá cũ (cần ≥ v20). Sẽ cài v20."
+    c_yellow "WARNING: Node.js $(node --version) is too old (need >= v20). Installing v20."
   fi
 fi
 if [ "$NEED_NODE" = true ]; then
-  banner "Cài Node.js 20 từ NodeSource"
+  banner "Installing Node.js 20 from NodeSource"
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
-  c_green "✓ Node.js $(node --version) đã cài"
+  c_green "OK Node.js $(node --version) installed"
 fi
 
 # ----- Chrome / Chromium -----
-banner "Cài Chrome (cho Playwright)"
+banner "Installing Chrome (for Playwright)"
 CHROME_BIN=""
 if command -v google-chrome >/dev/null 2>&1; then
   CHROME_BIN=$(command -v google-chrome)
-  c_green "✓ google-chrome đã có: $CHROME_BIN"
+  c_green "OK google-chrome found: $CHROME_BIN"
 elif command -v chromium >/dev/null 2>&1; then
   CHROME_BIN=$(command -v chromium)
-  c_green "✓ chromium đã có: $CHROME_BIN"
+  c_green "OK chromium found: $CHROME_BIN"
 elif command -v chromium-browser >/dev/null 2>&1; then
   CHROME_BIN=$(command -v chromium-browser)
-  c_green "✓ chromium-browser đã có: $CHROME_BIN"
+  c_green "OK chromium-browser found: $CHROME_BIN"
 else
-  echo "Cài Google Chrome stable..."
+  echo "Installing Google Chrome stable..."
   curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
   echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
     > /etc/apt/sources.list.d/google-chrome.list
   apt-get update -qq
   if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq google-chrome-stable; then
     CHROME_BIN=$(command -v google-chrome)
-    c_green "✓ Google Chrome đã cài"
+    c_green "OK Google Chrome installed"
   else
-    c_yellow "Google Chrome thất bại, fallback sang chromium..."
+    c_yellow "Google Chrome failed, falling back to chromium..."
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq chromium-browser || \
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq chromium
     CHROME_BIN=$(command -v chromium-browser || command -v chromium)
   fi
 fi
-[ -n "$CHROME_BIN" ] || { c_red "ERROR: không cài được Chrome/Chromium"; exit 1; }
+[ -n "$CHROME_BIN" ] || { c_red "ERROR: failed to install Chrome/Chromium"; exit 1; }
 
 # ----- noVNC stack -----
-banner "Cài noVNC stack (Xvfb + x11vnc + websockify + novnc)"
+banner "Installing noVNC stack (Xvfb + x11vnc + websockify + novnc)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   xvfb x11vnc websockify novnc fonts-noto-color-emoji >/dev/null
-c_green "✓ noVNC stack đã cài"
+c_green "OK noVNC stack installed"
 
 # ----- system user -----
 if ! id "$AGENT_USER" >/dev/null 2>&1; then
-  banner "Tạo system user $AGENT_USER"
-  useradd -r -s /usr/sbin/nologin -d "$INSTALL_DIR" -c "fb.autonow.vn agent" "$AGENT_USER"
+  banner "Creating system user $AGENT_USER"
+  useradd -r -s /usr/sbin/nologin -d "$INSTALL_DIR" -c "nextclaw agent" "$AGENT_USER"
 fi
 
 # ----- state + log dirs -----
@@ -155,16 +159,16 @@ chown -R "$AGENT_USER:$AGENT_USER" "$STATE_DIR" "$LOG_DIR"
 chmod 700 "$STATE_DIR"
 
 # ----- download + unpack agent -----
-banner "Tải agent tarball"
+banner "Downloading agent tarball"
 TMPTGZ=$(mktemp /tmp/agent-XXXXX.tgz)
 trap 'rm -f "$TMPTGZ"' EXIT
 curl -fsSL --retry 3 "$CLOUD_BASE_URL/agent/latest.tgz" -o "$TMPTGZ"
 SIZE=$(stat -c%s "$TMPTGZ")
 if [ "$SIZE" -lt 1024 ]; then
-  c_red "ERROR: tarball quá nhỏ ($SIZE bytes)"
+  c_red "ERROR: tarball too small ($SIZE bytes)"
   exit 1
 fi
-c_green "✓ Tải xong ($SIZE bytes)"
+c_green "OK Downloaded ($SIZE bytes)"
 
 mkdir -p "$INSTALL_DIR"
 tar -xzf "$TMPTGZ" -C "$INSTALL_DIR"
@@ -172,25 +176,25 @@ chown -R "$AGENT_USER:$AGENT_USER" "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/scripts/start-stack.sh" "$INSTALL_DIR/scripts/stop-stack.sh"
 
 # ----- npm install (tsx + playwright + node-cron) -----
-banner "Cài npm dependencies (tsx + playwright + node-cron)"
+banner "Installing npm dependencies (tsx + playwright + node-cron)"
 cd "$INSTALL_DIR"
 # Skip downloading Playwright's bundled browsers — we use system Chrome.
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
   sudo -u "$AGENT_USER" -H \
   npm install --omit=dev --no-audit --no-fund --silent 2>&1 | tail -5
-c_green "✓ npm dependencies cài xong"
+c_green "OK npm dependencies installed"
 
 # ----- VNC password -----
 # 32 hex chars = 128 bits entropy — brute-force-infeasible even if attacker
 # reaches port 6092 publicly. x11vnc accepts plain passwords; storepasswd hashes.
-banner "Sinh VNC password"
+banner "Generating VNC password"
 VNC_PASS=$(openssl rand -hex 16)
 x11vnc -storepasswd "$VNC_PASS" "$STATE_DIR/vnc.passwd" >/dev/null 2>&1
 chown "$AGENT_USER:$AGENT_USER" "$STATE_DIR/vnc.passwd"
 chmod 600 "$STATE_DIR/vnc.passwd"
 
 # ----- config files -----
-banner "Ghi config files"
+banner "Writing config files"
 mkdir -p "$CONFIG_DIR"
 INSTALLED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
@@ -238,7 +242,7 @@ chmod 644 "$CONFIG_DIR/agent.env"
 # Stack is split into 3 separate services + 1 target (Xvfb, x11vnc, websockify
 # each Type=simple with Restart=always). One dying → systemd respawns in 2s.
 # The old monolithic stack.service is removed if present.
-banner "Cài systemd units"
+banner "Installing systemd units"
 rm -f /etc/systemd/system/auto-facebook-agent-stack.service 2>/dev/null
 install -m 644 "$INSTALL_DIR/systemd/auto-facebook-agent-xvfb.service"       /etc/systemd/system/
 install -m 644 "$INSTALL_DIR/systemd/auto-facebook-agent-x11vnc.service"     /etc/systemd/system/
@@ -257,7 +261,7 @@ systemctl enable --now auto-facebook-agent
 
 # ----- sudoers: let auto-fb-agent execute specific systemctl + scripts -----
 # Required by src/commands.ts (dashboard-driven open/close login + discover_now)
-banner "Cài sudoers rule cho dashboard commands"
+banner "Installing sudoers rule for dashboard commands"
 cat > /etc/sudoers.d/auto-facebook-agent <<EOF
 # Allow auto-fb-agent to run specific systemctl + helper without password.
 # Drives the dashboard "Open Facebook" / "Discover groups" buttons.
@@ -266,26 +270,26 @@ auto-fb-agent ALL=(root) NOPASSWD: /bin/systemctl stop auto-facebook-agent-login
 auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/discover-now.sh
 EOF
 chmod 440 /etc/sudoers.d/auto-facebook-agent
-visudo -c -q -f /etc/sudoers.d/auto-facebook-agent && c_green "✓ sudoers OK" || c_red "⚠ sudoers syntax error"
+visudo -c -q -f /etc/sudoers.d/auto-facebook-agent && c_green "OK sudoers OK" || c_red "WARNING: sudoers syntax error"
 
 # ----- verify -----
-banner "Đợi heartbeat đầu tiên (15s)..."
+banner "Waiting for first heartbeat (15s)..."
 sleep 15
 if systemctl is-active --quiet auto-facebook-agent; then
-  c_green "✓ auto-facebook-agent đang chạy"
+  c_green "OK auto-facebook-agent is running"
 else
-  c_red "✗ auto-facebook-agent KHÔNG chạy"
+  c_red "FAILED: auto-facebook-agent is NOT running"
   systemctl status auto-facebook-agent --no-pager || true
   exit 1
 fi
 if systemctl is-active --quiet auto-facebook-agent-stack; then
-  c_green "✓ auto-facebook-agent-stack đang chạy"
+  c_green "OK auto-facebook-agent-stack is running"
 else
-  c_yellow "⚠ auto-facebook-agent-stack không active (chỉ ảnh hưởng tới noVNC, agent vẫn heartbeat)"
+  c_yellow "WARNING: auto-facebook-agent-stack not active (only affects noVNC, agent still heartbeats)"
 fi
 
 echo
-c_blue "Log agent (15 dòng gần nhất):"
+c_blue "Agent log (last 15 lines):"
 journalctl -u auto-facebook-agent -n 15 --no-pager || true
 
 # ----- success message -----
@@ -298,55 +302,55 @@ NOVNC_URL="http://${PUBLIC_IP}:${NOVNC_WEB_PORT}/vnc.html?autoconnect=true&resiz
 
 echo
 c_green "════════════════════════════════════════════════════════════════"
-c_green "  ✓ Agent đã cài thành công!"
+c_green "  OK Agent installed successfully!"
 c_green "════════════════════════════════════════════════════════════════"
 echo
-c_yellow "━━━ ĐỂ LOGIN FACEBOOK LẦN ĐẦU (chỉ 1 lần) ━━━"
+c_yellow "━━━ FIRST-TIME FACEBOOK LOGIN (one time only) ━━━"
 echo
-echo "  1. Khởi động Chrome (sẽ ngốn ~1.5GB RAM trong vài phút):"
+echo "  1. Start Chrome (uses ~1.5GB RAM for a few minutes):"
 echo
 echo "     systemctl start auto-facebook-agent-login"
 echo
-echo "  2. Mở browser, vô link noVNC:"
+echo "  2. Open a browser and go to the noVNC link:"
 echo
 echo "     $NOVNC_URL"
 echo
-echo "  3. Cửa sổ Chrome hiện ra trong noVNC → đăng nhập Facebook bình thường."
+echo "  3. A Chrome window appears in noVNC -> log in to Facebook as usual."
 echo
-echo "  4. Xong → systemctl stop auto-facebook-agent-login"
-echo "     (kiosk mode → không có X button; phải systemctl stop)"
-echo "     ETL agent tự crawl mỗi 2h."
+echo "  4. Done -> systemctl stop auto-facebook-agent-login"
+echo "     (kiosk mode has no X button; you must use systemctl stop)"
+echo "     The ETL agent crawls automatically every 2h."
 echo
-echo "  5. Force-crawl ngay (test):"
+echo "  5. Force a crawl now (test):"
 echo "     systemctl restart auto-facebook-agent"
 echo
-echo "  ⚠ NẾU FB BÁO CAPTCHA LOOP / LOGIN THẤT BẠI:"
+echo "  WARNING: IF FACEBOOK SHOWS A CAPTCHA LOOP / LOGIN FAILS:"
 echo "     bash /opt/auto-facebook-agent/scripts/reset-profile.sh"
-echo "     (xoá cookies/cache → login lại từ đầu)"
+echo "     (clears cookies/cache -> log in again from scratch)"
 echo
 
 # Run hardening (GRUB fix + mask Cockpit + UFW allow + fail2ban). Idempotent.
 # Set SKIP_HARDEN=1 to skip (advanced users with custom security setup).
 if [ "${SKIP_HARDEN:-0}" != "1" ] && [ -f "$INSTALL_DIR/scripts/harden-vps.sh" ]; then
   c_yellow "━━━ HARDENING VPS ━━━"
-  bash "$INSTALL_DIR/scripts/harden-vps.sh" || c_yellow "⚠ harden-vps.sh có lỗi (không chặn agent), check log trên"
+  bash "$INSTALL_DIR/scripts/harden-vps.sh" || c_yellow "WARNING: harden-vps.sh had errors (does not block the agent), check the log above"
   echo
 fi
 
-c_yellow "━━━ THÔNG TIN AGENT ━━━"
+c_yellow "━━━ AGENT INFO ━━━"
 echo
-echo "  Dashboard data:   $CLOUD_BASE_URL/  (login bằng email đã đăng ký)"
+echo "  Dashboard data:   $CLOUD_BASE_URL/  (log in to nextclaw with your registered email)"
 echo "  noVNC URL:        $NOVNC_URL"
 echo "  noVNC password:   $VNC_PASS"
-echo "  Xem log agent:    journalctl -fu auto-facebook-agent"
-echo "  Xem log stack:    journalctl -u auto-facebook-agent-stack -n 50"
+echo "  View agent log:   journalctl -fu auto-facebook-agent"
+echo "  View stack log:   journalctl -u auto-facebook-agent-stack -n 50"
 echo "  Config:           $CONFIG_FILE"
 echo
 c_yellow "━━━ FIREWALL ━━━"
 echo
-echo "  Port $NOVNC_WEB_PORT phải mở inbound. Hetzner/Vultr/DO mặc định đã mở."
-echo "  AWS/GCP/Azure: thêm port $NOVNC_WEB_PORT vào security group / firewall."
-echo "  Check thử: từ máy khác chạy:  curl -m 3 http://${PUBLIC_IP}:${NOVNC_WEB_PORT}/"
+echo "  Port $NOVNC_WEB_PORT must be open inbound. Hetzner/Vultr/DO open it by default."
+echo "  AWS/GCP/Azure: add port $NOVNC_WEB_PORT to the security group / firewall."
+echo "  Test it: from another machine run:  curl -m 3 http://${PUBLIC_IP}:${NOVNC_WEB_PORT}/"
 echo
 c_yellow "━━━ UNINSTALL ━━━"
 echo
