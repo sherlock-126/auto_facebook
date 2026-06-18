@@ -26,6 +26,7 @@ export interface GraphqlResponse {
   rawText: string;
   payloads: any[];                 // parsed top-level objects (NDJSON-aware)
   error?: string;
+  partialError?: string;           // non-fatal field-level FB error (data still usable)
 }
 
 export async function callGraphql(page: Page, auth: AuthContext, args: GraphqlCallArgs): Promise<GraphqlResponse> {
@@ -73,13 +74,34 @@ export async function callGraphql(page: Page, auth: AuthContext, args: GraphqlCa
     });
   }, { auth, ...args });
 
-  // Detect FB-level errors hidden in HTTP 200
+  // Detect FB-level errors hidden in HTTP 200.
+  // Distinguish FATAL (request-level: bad token, rate limit, query rejected →
+  // no data) from PARTIAL field errors. FB increasingly returns the full feed
+  // `data` alongside a `field_exception` on a deep optional field (e.g.
+  // `associated_group/feature_intervention`); those must NOT discard the posts.
   if (result.ok) {
+    const hasData = result.payloads.some(
+      (p) => p?.data && typeof p.data === 'object' && Object.keys(p.data).length > 0
+    );
     for (const p of result.payloads) {
-      const err = p?.error || p?.errors?.[0];
-      if (err) {
+      // Top-level singular `error` (e.g. {code:1357004} invalid token) is always
+      // request-level → fatal (client.ts refreshes auth on this).
+      if (p?.error) {
         result.ok = false;
-        result.error = `FB error: ${JSON.stringify(err).slice(0, 500)}`;
+        result.error = `FB error: ${JSON.stringify(p.error).slice(0, 500)}`;
+        break;
+      }
+      const errs = p?.errors;
+      if (Array.isArray(errs) && errs.length) {
+        // Field-level partial errors carry a `path` and arrive with usable data —
+        // tolerate (feed edges still present). Only fail when no data anywhere.
+        const fieldLevel = errs.every((e: any) => Array.isArray(e?.path) && e.path.length > 0);
+        if (fieldLevel && hasData) {
+          result.partialError = `FB partial: ${JSON.stringify(errs[0]).slice(0, 300)}`;
+          continue;
+        }
+        result.ok = false;
+        result.error = `FB error: ${JSON.stringify(errs[0]).slice(0, 500)}`;
         break;
       }
     }

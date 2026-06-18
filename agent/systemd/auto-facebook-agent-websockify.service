@@ -1,0 +1,19 @@
+[Unit]
+Description=fb.autonow.vn agent — websockify (noVNC web bridge, P0)
+Documentation=https://fb.autonow.vn
+After=auto-facebook-agent-x11vnc.service
+Requires=auto-facebook-agent-x11vnc.service
+PartOf=auto-facebook-agent-stack.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/auto-facebook-agent/stack.env
+ExecStart=/usr/bin/websockify --web ${NOVNC_DIR} ${VNC_BIND}:${NOVNC_WEB_PORT} 127.0.0.1:${VNC_RFB_PORT}
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-fb-agent-websockify
+
+[Install]
+WantedBy=auto-facebook-agent-stack.target

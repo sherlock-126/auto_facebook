@@ -9,9 +9,12 @@ export interface RunSummary {
   errors: { entity: string; scope: string; message: string }[];
 }
 
-async function listEnabledGroups(): Promise<string[]> {
+async function listEnabledGroups(tenantId: string): Promise<string[]> {
   const { rows } = await pool.query(
-    `SELECT group_id FROM dim_group WHERE enabled = TRUE AND is_joined = TRUE AND deleted_at IS NULL ORDER BY first_seen_at`
+    `SELECT group_id FROM dim_group
+      WHERE tenant_id = $1 AND enabled = TRUE AND is_joined = TRUE AND deleted_at IS NULL
+      ORDER BY first_seen_at`,
+    [tenantId]
   );
   return rows.map((r) => r.group_id as string);
 }
@@ -30,34 +33,24 @@ async function logRunFinish(id: number, status: string, message: string | null, 
   );
 }
 
-export async function runAll(mode: 'incr' | 'full'): Promise<RunSummary> {
+export async function runAll(mode: 'incr' | 'full', tenantId: string): Promise<RunSummary> {
+  if (!tenantId) throw new Error('runAll: tenantId required');
   const client = await createFbClient();
   const summary: RunSummary = { ok: true, results: [], errors: [] };
   try {
-    // 1. Refresh joined groups (global scope)
-    const joined = findEntity('fb_joined_groups');
-    if (joined) {
-      const runId = await logRunStart(`${joined.name}:${mode}`, 'global', { mode });
-      try {
-        const r = await joined.run({ client, scope: 'global', mode });
-        summary.results.push(r);
-        await logRunFinish(runId, 'ok', null, r.rows_seen, r.rows_upserted);
-      } catch (e: any) {
-        summary.ok = false;
-        summary.errors.push({ entity: joined.name, scope: 'global', message: String(e?.message ?? e) });
-        await logRunFinish(runId, 'error', String(e?.message ?? e), 0, 0);
-        if (e instanceof BudgetExceededError || e instanceof SessionWallError) throw e;
-      }
-    }
+    // NOTE: fb_joined_groups is intentionally NOT auto-run per tick — the
+    // user manually triggers it from the Groups tab when they join/leave
+    // groups (rare, ~weekly). Saves ~96 calls/day of budget. The manual
+    // trigger goes through /api/run with entity=fb_joined_groups.
 
-    // 2. Per-group entities
-    const groups = await listEnabledGroups();
+    // Per-group entities (scoped to this tenant)
+    const groups = await listEnabledGroups(tenantId);
     for (const gid of groups) {
       for (const entity of ENTITIES) {
         if (entity.name === 'fb_joined_groups') continue;
         const runId = await logRunStart(`${entity.name}:${mode}`, gid, { mode });
         try {
-          const r = await entity.run({ client, scope: gid, mode });
+          const r = await entity.run({ client, scope: gid, mode, tenantId });
           summary.results.push(r);
           await logRunFinish(runId, 'ok', null, r.rows_seen, r.rows_upserted);
         } catch (e: any) {
@@ -74,13 +67,14 @@ export async function runAll(mode: 'incr' | 'full'): Promise<RunSummary> {
   return summary;
 }
 
-export async function runOne(entityName: string, scope: string, mode: 'incr' | 'full'): Promise<EntityRunResult> {
+export async function runOne(entityName: string, scope: string, mode: 'incr' | 'full', tenantId?: string): Promise<EntityRunResult> {
   const entity = findEntity(entityName);
   if (!entity) throw new Error(`Unknown entity: ${entityName}`);
+  const tid = tenantId ?? process.env.DEFAULT_TENANT_ID ?? 'tu-n';
   const client = await createFbClient();
   const runId = await logRunStart(`${entityName}:${mode}`, scope, { mode, ad_hoc: true });
   try {
-    const r = await entity.run({ client, scope, mode });
+    const r = await entity.run({ client, scope, mode, tenantId: tid });
     await logRunFinish(runId, 'ok', null, r.rows_seen, r.rows_upserted);
     return r;
   } catch (e: any) {

@@ -1,0 +1,19 @@
+[Unit]
+Description=fb.autonow.vn agent — Xvfb virtual display (P0 — keeps noVNC reachable)
+Documentation=https://fb.autonow.vn
+After=network-online.target
+Wants=network-online.target
+PartOf=auto-facebook-agent-stack.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/auto-facebook-agent/stack.env
+ExecStart=/usr/bin/Xvfb ${XVFB_DISPLAY} -screen 0 1920x1080x24 -ac
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-fb-agent-xvfb
+
+[Install]
+WantedBy=auto-facebook-agent-stack.target

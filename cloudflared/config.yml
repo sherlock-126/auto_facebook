@@ -3,6 +3,8 @@ credentials-file: /root/.cloudflared/4f873c3e-981f-44de-a607-87fbce1afd38.json
 
 ingress:
   # auto_facebook — FB joined-groups scraper
+  - hostname: fb.autonow.vn
+    service: http://localhost:4200
   - hostname: dev-fb.autonow.vn
     service: http://localhost:4200
   - hostname: dev-fb-vnc.autonow.vn

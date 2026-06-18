@@ -10,3 +10,6 @@ tmp/
 data/
 playwright-report/
 test-results/
+data/dist/
+.claude/
+.vibedev-images/

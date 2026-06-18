@@ -18,10 +18,14 @@ async function main() {
   const cmd = process.argv[2];
   try {
     if (cmd === 'facts:all:incr') {
-      const r = await runAll('incr');
+      const tid = process.env.DEFAULT_TENANT_ID ?? process.argv[3];
+      if (!tid) throw new Error('Usage: facts:all:incr <tenantId>  (or set DEFAULT_TENANT_ID env)');
+      const r = await runAll('incr', tid);
       console.log(JSON.stringify(r, null, 2));
     } else if (cmd === 'facts:all:full') {
-      const r = await runAll('full');
+      const tid = process.env.DEFAULT_TENANT_ID ?? process.argv[3];
+      if (!tid) throw new Error('Usage: facts:all:full <tenantId>  (or set DEFAULT_TENANT_ID env)');
+      const r = await runAll('full', tid);
       console.log(JSON.stringify(r, null, 2));
     } else if (cmd === 'run') {
       const entity = process.argv[3];

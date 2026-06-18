@@ -1,0 +1,19 @@
+[Unit]
+Description=fb.autonow.vn agent — browser stack (Xvfb + x11vnc + websockify)
+Documentation=https://fb.autonow.vn
+After=network-online.target
+Wants=network-online.target
+Before=auto-facebook-agent.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/auto-facebook-agent/stack.env
+ExecStart=/opt/auto-facebook-agent/scripts/start-stack.sh
+ExecStop=/opt/auto-facebook-agent/scripts/stop-stack.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-fb-agent-stack
+
+[Install]
+WantedBy=multi-user.target

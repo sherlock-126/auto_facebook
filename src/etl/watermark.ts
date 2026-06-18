@@ -19,7 +19,7 @@ export async function writeWatermark(args: {
   await pool.query(
     `INSERT INTO etl_watermark (entity, scope, last_cursor_time, last_run_at, last_run_status, last_run_count, last_error)
      VALUES ($1, $2, $3, now(), $4, $5, $6)
-     ON CONFLICT (entity, scope) DO UPDATE SET
+     ON CONFLICT (tenant_id, entity, scope) DO UPDATE SET
        last_cursor_time = GREATEST(etl_watermark.last_cursor_time, EXCLUDED.last_cursor_time),
        last_run_at      = EXCLUDED.last_run_at,
        last_run_status  = EXCLUDED.last_run_status,

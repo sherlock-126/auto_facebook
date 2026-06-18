@@ -1,0 +1,22 @@
+[Unit]
+Description=fb.autonow.vn agent — x11vnc RFB server (P0 — keeps noVNC reachable)
+Documentation=https://fb.autonow.vn
+After=auto-facebook-agent-xvfb.service
+Requires=auto-facebook-agent-xvfb.service
+PartOf=auto-facebook-agent-stack.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/auto-facebook-agent/stack.env
+# Run in FOREGROUND (no -bg) so systemd tracks the process and auto-restarts
+# on death. The libgcrypt warning that's been killing x11vnc randomly is now
+# survivable — systemd respawns in 2 seconds.
+ExecStart=/usr/bin/x11vnc -display ${XVFB_DISPLAY} -rfbport ${VNC_RFB_PORT} -rfbauth ${VNC_PASSWD_FILE} -localhost -forever -shared -nopw -noxdamage
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-fb-agent-x11vnc
+
+[Install]
+WantedBy=auto-facebook-agent-stack.target

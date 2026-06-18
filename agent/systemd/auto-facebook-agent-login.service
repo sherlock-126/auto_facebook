@@ -1,0 +1,23 @@
+[Unit]
+Description=fb.autonow.vn agent — interactive Chrome for one-time FB login
+Documentation=https://fb.autonow.vn
+After=auto-facebook-agent-stack.target
+Wants=auto-facebook-agent-stack.target
+# Note: ETL agent stays running (still heartbeating). The chrome-profile lock
+# is enforced at application level — runner.ts checks /var/lib/auto-facebook-
+# agent/login.lock before each crawl tick and skips if it exists.
+
+[Service]
+Type=simple
+User=auto-fb-agent
+Group=auto-fb-agent
+WorkingDirectory=/opt/auto-facebook-agent
+EnvironmentFile=-/etc/auto-facebook-agent/agent.env
+ExecStart=/opt/auto-facebook-agent/scripts/login.sh
+Restart=no
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-fb-agent-login
+
+[Install]
+WantedBy=multi-user.target

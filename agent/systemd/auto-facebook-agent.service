@@ -1,0 +1,42 @@
+[Unit]
+Description=fb.autonow.vn agent (heartbeat + crawler)
+Documentation=https://fb.autonow.vn
+After=network-online.target auto-facebook-agent-stack.target
+Wants=network-online.target auto-facebook-agent-stack.target
+# Allow plenty of room for restarts (Playwright hangs may trigger a few in a
+# row while bad state cools off) — default 5 starts / 10s is too tight.
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+# Type=notify + WatchdogSec: agent sends sd_notify(WATCHDOG=1) every heartbeat
+# (~60s). If the Node event loop blocks (Playwright hang etc.) → no watchdog
+# pings → systemd SIGKILLs + Restart=always brings it back. Max silent window
+# bounded by WatchdogSec.
+Type=notify
+# `all` (not `main`) so child `systemd-notify` invocations are accepted — Node
+# has no native AF_UNIX datagram, we shell out to systemd-notify.
+NotifyAccess=all
+WatchdogSec=180
+User=auto-fb-agent
+Group=auto-fb-agent
+WorkingDirectory=/opt/auto-facebook-agent
+EnvironmentFile=-/etc/auto-facebook-agent/agent.env
+ExecStart=/opt/auto-facebook-agent/node_modules/.bin/tsx /opt/auto-facebook-agent/src/index.ts
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auto-fb-agent
+
+# Slice 2 needs Playwright Chrome → needs /tmp and /dev/shm writable.
+# Slice 3+ (v0.4) uses sudo for dashboard-driven commands → NoNewPrivileges
+# MUST stay off (sudo needs to escalate). Trade-off: agent can technically run
+# any sudo-allowed command; our sudoers.d only whitelists 3 specific commands.
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
