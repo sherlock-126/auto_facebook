@@ -1,0 +1,13 @@
+node_modules
+data
+.git
+.github
+.claude
+.agents
+.vibedev-images
+cloudflared
+deploy
+*.log
+.env
+.env.*
+docs

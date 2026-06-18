@@ -44,16 +44,16 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       const { email, password } = req.body ?? {} as any;
       if (!email || !password) return reply.status(400).send({ error: 'missing_fields' });
       const u = await findUserByEmail(email);
-      if (!u) return reply.status(401).send({ error: 'invalid_credentials', message: 'Email hoặc mật khẩu sai' });
+      if (!u) return reply.status(401).send({ error: 'invalid_credentials', message: 'Wrong email or password' });
       const ok = await verifyPassword(password, u.password_hash);
-      if (!ok) return reply.status(401).send({ error: 'invalid_credentials', message: 'Email hoặc mật khẩu sai' });
+      if (!ok) return reply.status(401).send({ error: 'invalid_credentials', message: 'Wrong email or password' });
       if (!u.email_verified_at) {
-        return reply.status(403).send({ error: 'email_not_verified', message: 'Vui lòng xác thực email trước khi đăng nhập' });
+        return reply.status(403).send({ error: 'email_not_verified', message: 'Please verify your email before logging in' });
       }
       if (!u.approved_at) {
         return reply.status(403).send({
           error: 'pending_approval',
-          message: 'Tài khoản đang chờ admin duyệt. Bạn sẽ nhận email khi được duyệt.',
+          message: 'Your account is awaiting activation. We will email you once it is switched on.',
         });
       }
       const jwt = await signSession({ sub: u.user_id, tid: u.tenant_id, role: u.role, email: u.email });
@@ -132,7 +132,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       }
       const result = await consumeToken(token, 'reset_password');
       if (!result.ok || !result.user_id) {
-        return reply.status(400).send({ error: 'invalid_or_expired_token', message: 'Link đặt lại không hợp lệ hoặc đã hết hạn' });
+        return reply.status(400).send({ error: 'invalid_or_expired_token', message: 'This reset link is invalid or has expired' });
       }
       const hash = await hashPassword(password);
       await updatePassword(result.user_id, hash);
@@ -153,7 +153,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       const { rows } = await pool.query('SELECT password_hash FROM users WHERE user_id = $1', [req.user_id!]);
       if (!rows[0]) return reply.status(404).send({ error: 'user_not_found' });
       const ok = await verifyPassword(current_password, rows[0].password_hash);
-      if (!ok) return reply.status(401).send({ error: 'wrong_password', message: 'Mật khẩu hiện tại sai' });
+      if (!ok) return reply.status(401).send({ error: 'wrong_password', message: 'Current password is wrong' });
       const hash = await hashPassword(new_password);
       await updatePassword(req.user_id!, hash);
       return { ok: true };

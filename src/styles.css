@@ -11,8 +11,8 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 240 60% 50%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 77 84% 62%;
+    --primary-foreground: 230 55% 12%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
@@ -27,7 +27,7 @@
     --warning-foreground: 0 0% 100%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 240 60% 50%;
+    --ring: 77 84% 62%;
     --radius: 0.625rem;
 
     /* Legacy aliases (so inline-style code keeps working) */
@@ -54,45 +54,46 @@
   }
 
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 210 40% 98%;
-    --card: 240 10% 6%;
-    --card-foreground: 210 40% 98%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 50.6%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 65% 50%;
-    --warning: 48 96% 53%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* nextclaw "The Catch": ink navy base + lime signal accent */
+    --background: 230 55% 12%;
+    --foreground: 228 47% 94%;
+    --card: 230 50% 15%;
+    --card-foreground: 228 47% 94%;
+    --popover: 230 50% 15%;
+    --popover-foreground: 228 47% 94%;
+    --primary: 77 84% 62%;
+    --primary-foreground: 230 55% 12%;
+    --secondary: 230 47% 20%;
+    --secondary-foreground: 228 47% 94%;
+    --muted: 230 47% 20%;
+    --muted-foreground: 227 28% 69%;
+    --accent: 230 47% 22%;
+    --accent-foreground: 228 47% 94%;
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 228 47% 94%;
+    --success: 168 64% 69%;
+    --warning: 40 96% 58%;
+    --border: 230 41% 24%;
+    --input: 230 41% 24%;
+    --ring: 77 84% 62%;
 
-    --bg: #0a0a0f;
-    --bg-sidebar: #0d0d12;
-    --bg-topbar: #0d0d12;
-    --bg-card: #0f1117;
-    --bg-input: #131520;
-    --bg-hover: #1a1d2a;
-    --bg-active: #1f2937;
-    --border-strong: #2a2d3a;
-    --text: #f8fafc;
-    --text-2: #cbd5e1;
-    --text-muted: #94a3b8;
-    --accent-soft: #1e1b4b;
-    --success-soft: #052e16;
-    --danger: #f87171;
-    --danger-soft: #450a0a;
+    --bg: #0E1430;
+    --bg-sidebar: #0b1029;
+    --bg-topbar: #0E1430;
+    --bg-card: #131A3B;
+    --bg-input: #0E1430;
+    --bg-hover: #18204A;
+    --bg-active: #1b2450;
+    --border-strong: #2f3a6e;
+    --text: #EAEDF7;
+    --text-2: #c4cae6;
+    --text-muted: #9AA3C7;
+    --accent-soft: #18204A;
+    --success-soft: #10312a;
+    --danger: #ff9aa3;
+    --danger-soft: #3a1c28;
     --warning: #fbbf24;
-    --warning-soft: #451a03;
+    --warning-soft: #3a2e10;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow:    0 4px 12px rgb(0 0 0 / 0.4);
     --shadow-lg: 0 14px 36px -10px rgb(0 0 0 / 0.55);

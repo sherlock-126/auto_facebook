@@ -33,7 +33,7 @@ export function isAdminEmail(email: string | undefined | null): boolean {
 /** Hard gate: 403 if logged in but not in ADMIN_EMAILS. Must run after requireAuth or loadSession. */
 export async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (!req.user_id) return reply.status(401).send({ error: 'unauthorized' });
-  if (!req.is_admin) return reply.status(403).send({ error: 'forbidden', message: 'Cần quyền admin' });
+  if (!req.is_admin) return reply.status(403).send({ error: 'forbidden', message: 'Admin access required' });
 }
 
 export async function loadSession(req: FastifyRequest): Promise<SessionPayload | null> {
@@ -49,7 +49,7 @@ export async function loadSession(req: FastifyRequest): Promise<SessionPayload |
 /** Hard gate: 401 if no/invalid session. */
 export async function requireAuth(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const sess = await loadSession(req);
-  if (!sess) return reply.status(401).send({ error: 'unauthorized', message: 'Cần đăng nhập' });
+  if (!sess) return reply.status(401).send({ error: 'unauthorized', message: 'Login required' });
   req.user_id    = sess.sub;
   req.tenant_id  = sess.tid;
   req.role       = sess.role;
@@ -70,7 +70,7 @@ export async function loadAuthOptional(req: FastifyRequest, _reply: FastifyReply
 export function requireRole(...allowed: string[]) {
   return async function (req: FastifyRequest, reply: FastifyReply): Promise<void> {
     if (!req.role || !allowed.includes(req.role)) {
-      return reply.status(403).send({ error: 'forbidden', message: 'Không có quyền truy cập' });
+      return reply.status(403).send({ error: 'forbidden', message: 'Access denied' });
     }
   };
 }

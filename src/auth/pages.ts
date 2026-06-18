@@ -1,36 +1,56 @@
 /**
  * Auth UI: signup / login / verify / forgot / reset.
- * Standalone HTML pages (not part of the app shell). Dark theme.
+ * Standalone HTML pages (not part of the app shell), styled to the nextclaw
+ * "The Catch" system: ink navy + lime signal accent, Space Grotesk / Inter / Space Mono.
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 
 function shell(title: string, body: string): string {
   return `<!doctype html>
-<html lang="vi"><head>
+<html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · fb.autonow.vn</title>
+<title>${esc(title)} · nextclaw</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1020; color: #e8ecf3; }
-  body { display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .card { background: #131a33; border: 1px solid #222a4a; border-radius: 12px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
-  h1 { font-size: 22px; margin: 0 0 6px; }
-  .brand { color: #7ea7ff; font-size: 12px; margin-bottom: 22px; }
-  label { display: block; font-size: 12px; color: #a9b3d1; margin: 14px 0 5px; }
-  input { width: 100%; background: #0a0f24; color: #e8ecf3; border: 1px solid #222a4a; border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: inherit; }
-  input:focus { outline: none; border-color: #3b6ef0; }
-  button { width: 100%; background: #3b6ef0; color: #fff; border: 0; padding: 11px; border-radius: 6px; font-size: 14px; font-weight: 600; margin-top: 18px; cursor: pointer; }
-  button:hover { filter: brightness(1.1); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .alt { font-size: 12px; color: #8a96bd; margin-top: 18px; text-align: center; }
-  .alt a { color: #7ea7ff; text-decoration: none; }
-  .msg { padding: 9px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; display: none; }
-  .msg.show { display: block; }
-  .msg.ok { background: #1f3f2a; color: #9eecbe; border: 1px solid #2a5a3b; }
-  .msg.err { background: #3a1c28; color: #ff9aa3; border: 1px solid #4a1f24; }
-  .msg.info { background: #1a2240; color: #cad3ed; border: 1px solid #222a4a; }
-  .hint { font-size: 11px; color: #8a96bd; margin-top: 4px; }
+  :root{
+    --ink:#0E1430; --ink-2:#131A3B; --text:#EAEDF7; --muted:#9AA3C7; --noise:#525a82;
+    --signal:#C2F24A; --signal-ink:#0E1430; --mint:#7CE3C4; --line:#242C57;
+    --display:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;
+    --body:'Inter',ui-sans-serif,system-ui,sans-serif;
+    --mono:'Space Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{font-family:var(--body);background:var(--ink);color:var(--text);display:flex;align-items:center;justify-content:center;padding:20px;
+    background-image:radial-gradient(800px 460px at 50% -10%, rgba(194,242,74,.08), transparent 60%);-webkit-font-smoothing:antialiased;}
+  .card{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:32px;width:100%;max-width:400px;
+    box-shadow:0 30px 80px -40px rgba(0,0,0,.7);}
+  .brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:-.02em;margin-bottom:4px;}
+  .brand .mark{color:var(--signal);}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:var(--noise);margin-bottom:22px;}
+  h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.02em;margin:0 0 18px;}
+  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:500;}
+  input{width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-size:14px;font-family:inherit;}
+  input::placeholder{color:var(--noise);}
+  input:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px rgba(194,242,74,.12);}
+  button{width:100%;background:var(--signal);color:var(--signal-ink);border:0;padding:12px;border-radius:10px;font-size:14px;font-weight:600;
+    font-family:var(--body);margin-top:20px;cursor:pointer;transition:transform .12s ease,filter .15s;}
+  button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.04);}
+  button:disabled{opacity:.55;cursor:not-allowed;}
+  button:focus-visible{outline:2px solid var(--mint);outline-offset:2px;}
+  .alt{font-size:13px;color:var(--muted);margin-top:20px;text-align:center;}
+  .alt a{color:var(--mint);text-decoration:none;}
+  .alt a:hover{text-decoration:underline;}
+  .msg{padding:10px 13px;border-radius:9px;font-size:13px;margin-bottom:14px;display:none;line-height:1.45;}
+  .msg.show{display:block;}
+  .msg.ok{background:rgba(124,227,196,.1);color:var(--mint);border:1px solid rgba(124,227,196,.3);}
+  .msg.err{background:rgba(255,120,130,.08);color:#ff9aa3;border:1px solid rgba(255,120,130,.25);}
+  .msg.info{background:rgba(154,163,199,.08);color:var(--muted);border:1px solid var(--line);}
+  .msg a{color:var(--mint);}
+  .hint{font-size:11px;color:var(--noise);margin-top:5px;}
 </style>
 <script>
 // Helpers must be defined BEFORE the body's inline scripts run (otherwise the
@@ -46,8 +66,9 @@ function getQS(name) { return new URLSearchParams(location.search).get(name); }
 </script>
 </head><body>
 <div class="card">
+  <div class="brand"><span class="mark">&#9670;</span>nextclaw</div>
+  <div class="kicker">// catch buyers from Facebook groups</div>
   <h1>${esc(title)}</h1>
-  <div class="brand">fb.autonow.vn · FB Group Intelligence</div>
   ${body}
 </div>
 </body></html>`;
@@ -60,38 +81,38 @@ function esc(s: string): string {
 export async function registerAuthPages(app: FastifyInstance): Promise<void> {
   // ---- SIGNUP ----
   app.get('/auth/signup', async (_req, reply) => {
-    reply.type('text/html').send(shell('Đăng ký', `
+    reply.type('text/html').send(shell('Create your account', `
       <div id="msg" class="msg"></div>
       <form id="f">
-        <label>Tên workspace (tùy chọn)</label>
-        <input name="tenant_name" placeholder="vd: ACME Corp" maxlength="80">
-        <div class="hint">Mặc định lấy từ email nếu bỏ trống</div>
+        <label>Workspace name (optional)</label>
+        <input name="tenant_name" placeholder="e.g. ACME Corp" maxlength="80">
+        <div class="hint">Defaults to your email if left blank</div>
         <label>Email</label>
         <input name="email" type="email" required autocomplete="email">
-        <label>Mật khẩu</label>
+        <label>Password</label>
         <input name="password" type="password" required minlength="8" autocomplete="new-password">
-        <div class="hint">Ít nhất 8 ký tự</div>
-        <button type="submit" id="btn">Tạo tài khoản</button>
+        <div class="hint">At least 8 characters</div>
+        <button type="submit" id="btn">Create account</button>
       </form>
-      <div class="alt">Đã có tài khoản? <a href="/auth/login">Đăng nhập</a></div>
+      <div class="alt">Already have an account? <a href="/auth/login">Log in</a></div>
       <script>
       document.getElementById('f').addEventListener('submit', async (e) => {
         e.preventDefault();
-        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = '⏳ Đang xử lý…';
+        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = 'Working…';
         var data = Object.fromEntries(new FormData(e.target));
         try {
           var r = await fetch('/auth/signup', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(data) });
           var j = await r.json();
           if (j.ok) {
-            showMsg('ok', '✅ Đã gửi email xác thực tới ' + data.email + '. Sau khi xác thực, tài khoản sẽ vào hàng đợi duyệt — bạn sẽ nhận email khi admin approve.');
-            btn.textContent = 'Đã gửi email';
+            showMsg('ok', 'Verification email sent to ' + data.email + '. Once you verify, your account joins the activation queue — we\\'ll email you when it\\'s switched on.');
+            btn.textContent = 'Email sent';
           } else {
-            showMsg('err', '❌ ' + (j.message || j.error || 'Lỗi không xác định'));
-            btn.disabled = false; btn.textContent = 'Tạo tài khoản';
+            showMsg('err', (j.message || j.error || 'Something went wrong'));
+            btn.disabled = false; btn.textContent = 'Create account';
           }
         } catch (err) {
-          showMsg('err', '❌ Lỗi mạng: ' + err.message);
-          btn.disabled = false; btn.textContent = 'Tạo tài khoản';
+          showMsg('err', 'Network error: ' + err.message);
+          btn.disabled = false; btn.textContent = 'Create account';
         }
       });
       </script>
@@ -100,31 +121,31 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
 
   // ---- LOGIN ----
   app.get('/auth/login', async (_req, reply) => {
-    reply.type('text/html').send(shell('Đăng nhập', `
+    reply.type('text/html').send(shell('Log in', `
       <div id="msg" class="msg"></div>
       <form id="f">
         <label>Email</label>
         <input name="email" type="email" required autocomplete="email">
-        <label>Mật khẩu</label>
+        <label>Password</label>
         <input name="password" type="password" required autocomplete="current-password">
-        <button type="submit" id="btn">Đăng nhập</button>
+        <button type="submit" id="btn">Log in</button>
       </form>
-      <div class="alt"><a href="/auth/forgot">Quên mật khẩu?</a> · <a href="/auth/signup">Đăng ký</a></div>
+      <div class="alt"><a href="/auth/forgot">Forgot password?</a> &middot; <a href="/auth/signup">Sign up</a></div>
       <script>
       // Surface ?msg= from verify/etc redirects
       (function(){
         var m = getQS('msg');
-        if (m === 'verified')              showMsg('ok',   '✅ Đã xác thực email — đăng nhập để tiếp tục.');
-        else if (m === 'verified_pending') showMsg('info', '✅ Đã xác thực email. Tài khoản đang chờ admin duyệt — bạn sẽ nhận email khi được duyệt và có thể đăng nhập.');
-        else if (m === 'approved')         showMsg('ok',   '🎉 Tài khoản đã được duyệt! Đăng nhập để tiếp tục.');
-        else if (m === 'reset_ok')         showMsg('ok',   '✅ Mật khẩu đã được đặt lại.');
-        else if (m === 'used')             showMsg('err',  '❌ Link này đã được sử dụng.');
-        else if (m === 'expired')          showMsg('err',  '❌ Link đã hết hạn — yêu cầu link mới.');
-        else if (m === 'invalid_token')    showMsg('err',  '❌ Link không hợp lệ.');
+        if (m === 'verified')              showMsg('ok',   'Email verified — log in to continue.');
+        else if (m === 'verified_pending') showMsg('info', 'Email verified. Your account is awaiting activation — we\\'ll email you once it\\'s switched on, then you can log in.');
+        else if (m === 'approved')         showMsg('ok',   'Your account is active! Log in to continue.');
+        else if (m === 'reset_ok')         showMsg('ok',   'Your password has been reset.');
+        else if (m === 'used')             showMsg('err',  'This link has already been used.');
+        else if (m === 'expired')          showMsg('err',  'This link has expired — request a new one.');
+        else if (m === 'invalid_token')    showMsg('err',  'This link is invalid.');
       })();
       document.getElementById('f').addEventListener('submit', async (e) => {
         e.preventDefault();
-        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = '⏳ Đang đăng nhập…';
+        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = 'Logging in…';
         var data = Object.fromEntries(new FormData(e.target));
         try {
           var r = await fetch('/auth/login', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(data), credentials: 'same-origin' });
@@ -132,22 +153,22 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
           if (j.ok) { location.href = '/'; }
           else {
             if (j.error === 'email_not_verified') {
-              showMsg('err', '❌ Cần xác thực email trước. <a href="#" id="rv" style="color:#7ea7ff;">Gửi lại email xác thực</a>');
+              showMsg('err', 'Please verify your email first. <a href="#" id="rv">Resend verification email</a>');
               document.getElementById('rv').onclick = async (e2) => {
                 e2.preventDefault();
                 await fetch('/auth/resend-verification', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ email: data.email }) });
-                showMsg('ok', '✅ Đã gửi lại email xác thực.');
+                showMsg('ok', 'Verification email resent.');
               };
             } else if (j.error === 'pending_approval') {
-              showMsg('info', '⏳ Tài khoản đang chờ admin duyệt. Bạn sẽ nhận email khi được duyệt.');
+              showMsg('info', 'Your account is awaiting activation. We\\'ll email you once it\\'s switched on.');
             } else {
-              showMsg('err', '❌ ' + (j.message || 'Đăng nhập thất bại'));
+              showMsg('err', (j.message || 'Login failed'));
             }
-            btn.disabled = false; btn.textContent = 'Đăng nhập';
+            btn.disabled = false; btn.textContent = 'Log in';
           }
         } catch (err) {
-          showMsg('err', '❌ Lỗi mạng: ' + err.message);
-          btn.disabled = false; btn.textContent = 'Đăng nhập';
+          showMsg('err', 'Network error: ' + err.message);
+          btn.disabled = false; btn.textContent = 'Log in';
         }
       });
       </script>
@@ -156,22 +177,22 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
 
   // ---- FORGOT ----
   app.get('/auth/forgot', async (_req, reply) => {
-    reply.type('text/html').send(shell('Quên mật khẩu', `
+    reply.type('text/html').send(shell('Reset your password', `
       <div id="msg" class="msg"></div>
       <form id="f">
-        <label>Email tài khoản</label>
+        <label>Account email</label>
         <input name="email" type="email" required autocomplete="email">
-        <button type="submit" id="btn">Gửi link đặt lại</button>
+        <button type="submit" id="btn">Send reset link</button>
       </form>
-      <div class="alt"><a href="/auth/login">← Quay lại đăng nhập</a></div>
+      <div class="alt"><a href="/auth/login">&larr; Back to log in</a></div>
       <script>
       document.getElementById('f').addEventListener('submit', async (e) => {
         e.preventDefault();
-        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = '⏳ Đang gửi…';
+        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = 'Sending…';
         var data = Object.fromEntries(new FormData(e.target));
         await fetch('/auth/forgot', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(data) });
-        showMsg('ok', '✅ Nếu email tồn tại, link đặt lại đã được gửi. Kiểm tra hộp thư.');
-        btn.textContent = 'Đã gửi';
+        showMsg('ok', 'If that email exists, a reset link is on its way. Check your inbox.');
+        btn.textContent = 'Sent';
       });
       </script>
     `));
@@ -180,25 +201,25 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
   // ---- RESET ----
   app.get<{ Querystring: { t?: string } }>('/auth/reset', async (req, reply) => {
     const token = req.query.t ?? '';
-    reply.type('text/html').send(shell('Đặt mật khẩu mới', `
+    reply.type('text/html').send(shell('Set a new password', `
       <div id="msg" class="msg"></div>
       <form id="f">
         <input type="hidden" name="token" value="${esc(token)}">
-        <label>Mật khẩu mới</label>
+        <label>New password</label>
         <input name="password" type="password" required minlength="8" autocomplete="new-password">
-        <div class="hint">Ít nhất 8 ký tự</div>
-        <button type="submit" id="btn">Đặt mật khẩu</button>
+        <div class="hint">At least 8 characters</div>
+        <button type="submit" id="btn">Set password</button>
       </form>
-      <div class="alt"><a href="/auth/login">← Đăng nhập</a></div>
+      <div class="alt"><a href="/auth/login">&larr; Log in</a></div>
       <script>
       document.getElementById('f').addEventListener('submit', async (e) => {
         e.preventDefault();
-        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = '⏳ Đang xử lý…';
+        var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = 'Working…';
         var data = Object.fromEntries(new FormData(e.target));
         var r = await fetch('/auth/reset', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(data) });
         var j = await r.json();
         if (j.ok) { location.href = '/auth/login?msg=reset_ok'; }
-        else { showMsg('err', '❌ ' + (j.message || j.error || 'Lỗi')); btn.disabled = false; btn.textContent = 'Đặt mật khẩu'; }
+        else { showMsg('err', (j.message || j.error || 'Something went wrong')); btn.disabled = false; btn.textContent = 'Set password'; }
       });
       </script>
     `));

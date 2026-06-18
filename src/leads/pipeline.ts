@@ -31,28 +31,28 @@ export const STAGE_VALUES = [
 export type Stage = (typeof STAGE_VALUES)[number];
 
 export const STAGE_LABELS: Record<Stage, string> = {
-  new:             'Chưa tiếp cận',
-  contacted:       'Đã liên hệ',
-  info_sent:       'Đã gửi thông tin',
-  negotiating:     'Đang deal giá',
-  sample_sent:     'Đã gửi mẫu',
-  awaiting_reply:  'Chờ phản hồi',
-  topup_1:         'Topup lần 01',
-  first_order:     'Lên đơn đầu',
-  topup_2:         'Topup lần 02',
-  shipped_sg:      'Chuyển SG',
-  closed_won:      'Chốt thành công',
-  closed_lost:     'Mất lead',
+  new:             'New',
+  contacted:       'Contacted',
+  info_sent:       'Info sent',
+  negotiating:     'Negotiating',
+  sample_sent:     'Sample sent',
+  awaiting_reply:  'Awaiting reply',
+  topup_1:         'Top-up 1',
+  first_order:     'First order',
+  topup_2:         'Top-up 2',
+  shipped_sg:      'Shipped',
+  closed_won:      'Won',
+  closed_lost:     'Lost',
 };
 
 export const INTENT_LABELS: Record<Intent, string> = {
-  request_quote: 'Hỏi giá',
-  question:      'Câu hỏi',
-  complaint:     'Phàn nàn',
-  showcase:      'Khoe sản phẩm',
-  spam:          'Spam quảng cáo',
-  seeding:       'Bài seeding',
-  other:         'Khác',
+  request_quote: 'Asking for price',
+  question:      'Question',
+  complaint:     'Complaint',
+  showcase:      'Showcase',
+  spam:          'Spam',
+  seeding:       'Seeding',
+  other:         'Other',
 };
 
 export interface TenantConfig {

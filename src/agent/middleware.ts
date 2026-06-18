@@ -48,6 +48,6 @@ export async function requireAgent(req: FastifyRequest, reply: FastifyReply): Pr
   if (req.is_agent) return;
   const ok = await tryAuthAgent(req);
   if (!ok) {
-    return reply.status(401).send({ error: 'invalid_license', message: 'License key không hợp lệ' });
+    return reply.status(401).send({ error: 'invalid_license', message: 'Invalid license key' });
   }
 }

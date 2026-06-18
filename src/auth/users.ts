@@ -59,10 +59,10 @@ export async function createUserAndTenant(args: {
   tenant_name?: string;
 }): Promise<CreatedUser> {
   const email = args.email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Email không hợp lệ');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Invalid email');
 
   const existing = await findUserByEmail(email);
-  if (existing) throw new Error('Email đã được đăng ký');
+  if (existing) throw new Error('That email is already registered');
 
   const hash = await hashPassword(args.password);
   const tenantName = (args.tenant_name?.trim() || email.split('@')[0]).slice(0, 80);

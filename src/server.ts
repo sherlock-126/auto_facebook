@@ -141,7 +141,7 @@ app.post<{ Body: { url?: string; name?: string; enabled?: boolean } }>('/api/gro
   if (!raw) return reply.status(400).send({ ok: false, error: 'missing url' });
   // Extract group id: accept full URL (groups/<id>/) or just digits
   const m = raw.match(/groups\/(\d{6,})/) ?? raw.match(/^(\d{6,})$/);
-  if (!m) return reply.status(400).send({ ok: false, error: 'Không parse được group ID. Paste full URL https://www.facebook.com/groups/<id>/ hoặc chỉ ID số.' });
+  if (!m) return reply.status(400).send({ ok: false, error: 'Could not parse group ID. Paste the full URL https://www.facebook.com/groups/<id>/ or just the numeric ID.' });
   const groupId = m[1];
   const url     = `https://www.facebook.com/groups/${groupId}/`;
   const enabled = req.body?.enabled !== false; // default ON since user explicitly added
@@ -158,14 +158,14 @@ app.post<{ Body: { url?: string; name?: string; enabled?: boolean } }>('/api/gro
         WHERE group_id=$4 AND tenant_id=$5`,
       [enabled, req.body.name ?? null, url, groupId, tid]
     );
-    return { ok: true, group_id: groupId, message: 'Group đã có sẵn — đã update + enable.' };
+    return { ok: true, group_id: groupId, message: 'Group already existed — updated and enabled.' };
   }
   await pool.query(
     `INSERT INTO dim_group (group_id, tenant_id, name, url, is_joined, enabled, raw, first_seen_at)
      VALUES ($1, $2, $3, $4, TRUE, $5, '{}'::jsonb, now())`,
     [groupId, tid, req.body.name ?? `Group ${groupId}`, url, enabled]
   );
-  return { ok: true, group_id: groupId, message: 'Đã thêm group. Cron */30 phút kế tiếp sẽ crawl.' };
+  return { ok: true, group_id: groupId, message: 'Group added. The next */30-min cron will crawl it.' };
 });
 
 // ----- ad-hoc run -----
@@ -200,7 +200,7 @@ app.post('/api/agent/reset-fingerprint', async (req, reply) => {
   if (rows[0].sec_ago < 300) {
     return reply.status(409).send({
       error: 'agent_still_online',
-      message: `Agent vẫn đang gửi heartbeat (${rows[0].sec_ago}s trước). Dừng agent trên VPS cũ trước khi reset.`,
+      message: `Agent is still sending heartbeats (${rows[0].sec_ago}s ago). Stop the agent on the old VPS before resetting.`,
     });
   }
   await pool.query('UPDATE agent_connections SET hostname = NULL WHERE tenant_id = $1', [tid]);
@@ -943,7 +943,7 @@ app.post('/api/leads/reclassify-all', async (req, reply) => {
 
   return {
     ok: true,
-    message: `Đã xoá ${deletedLeads ?? 0} leads + ${deletedCache ?? 0} cache. Đang re-classify ${postCount} posts ở background — refresh Leads tab sau ~5 phút.`,
+    message: `Deleted ${deletedLeads ?? 0} leads + ${deletedCache ?? 0} cache. Re-classifying ${postCount} posts in the background — refresh the Leads tab in ~5 min.`,
     deleted_leads: deletedLeads ?? 0,
     deleted_cache: deletedCache ?? 0,
     posts_to_classify: postCount,
@@ -1015,8 +1015,8 @@ app.post('/api/settings/telegram/test', async (req, reply) => {
   if (!req.user_id) return reply.status(401).send({ error: 'unauthorized' });
   const { sendTelegramTest } = await import('./leads/notifier.js');
   const r = await sendTelegramTest(req.tenant_id!);
-  if (r.ok) return { ok: true, message: '✅ Đã gửi message thử — check Telegram của bạn' };
-  return reply.status(400).send({ ok: false, error: r.error || 'Gửi thất bại' });
+  if (r.ok) return { ok: true, message: '✅ Test message sent — check your Telegram' };
+  return reply.status(400).send({ ok: false, error: r.error || 'Send failed' });
 });
 
 // ----- Telegram: detect forum topics inside the saved chat -----
@@ -1027,7 +1027,7 @@ app.post('/api/settings/telegram/detect-topics', async (req, reply) => {
   const cfg = await getTenantConfig(req.tenant_id!);
   const token = cfg.telegram_bot_token;
   const chatId = cfg.telegram_chat_id;
-  if (!token || !chatId) return reply.status(400).send({ ok: false, error: 'Cần lưu bot_token + chat_id trước' });
+  if (!token || !chatId) return reply.status(400).send({ ok: false, error: 'Save bot_token + chat_id first' });
   try {
     const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`, { signal: AbortSignal.timeout(10000) });
     const j: any = await r.json().catch(() => ({}));
@@ -1045,7 +1045,7 @@ app.post('/api/settings/telegram/detect-topics', async (req, reply) => {
     }
     const topics = Array.from(seen.entries()).map(([id, name]) => ({ thread_id: id, name }));
     if (topics.length === 0) {
-      return { ok: true, topics: [], message: 'Chưa thấy topic nào. Hãy gửi 1 tin nhắn bất kỳ vào mỗi topic (HR + Fulfill) rồi click Detect lại.' };
+      return { ok: true, topics: [], message: 'No topics found yet. Send any message into each topic (HR + Fulfill), then click Detect again.' };
     }
     return { ok: true, topics };
   } catch (e: any) {
@@ -1061,7 +1061,7 @@ app.post<{ Body: { bot_token?: string } }>('/api/settings/telegram/detect-chat',
   if (!req.user_id) return reply.status(401).send({ error: 'unauthorized' });
   const token = (req.body?.bot_token ?? '').trim();
   if (!token || !/^\d+:[A-Za-z0-9_-]{20,}$/.test(token)) {
-    return reply.status(400).send({ ok: false, error: 'Bot token sai định dạng (phải dạng 123456:ABC...)' });
+    return reply.status(400).send({ ok: false, error: 'Invalid bot token format (must look like 123456:ABC...)' });
   }
   try {
     const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=50`, {
@@ -1087,7 +1087,7 @@ app.post<{ Body: { bot_token?: string } }>('/api/settings/telegram/detect-chat',
     }
     const chats = Array.from(seen.values());
     if (chats.length === 0) {
-      return { ok: true, chats: [], message: 'Bot chưa nhận message nào. Hãy mở Telegram → tìm bot → bấm Start (/start), rồi click Detect lại.' };
+      return { ok: true, chats: [], message: 'The bot has not received any messages yet. Open Telegram, find the bot, tap Start (/start), then click Detect again.' };
     }
     return { ok: true, chats };
   } catch (e: any) {
@@ -1160,7 +1160,7 @@ app.get('/install.sh', async (_req, reply) => {
 });
 
 // ----- Facebook launcher bridge page -----
-// User clicks "Mở Facebook" on dashboard → opens new tab to this page.
+// User clicks "Open Facebook" on dashboard → opens new tab to this page.
 // Page calls /api/dashboard/agent/command (open_login), polls status, and
 // redirects to noVNC URL as soon as Chrome is ready on the agent. Removes the
 // "click → wait → click again" double-step UX confusion.
@@ -1169,8 +1169,8 @@ app.get<{ Querystring: { url?: string } }>('/fb-launcher', async (req, reply) =>
   const preselect = (req.query.url ?? '').slice(0, 500);
   reply.type('text/html').send(`<!doctype html>
 <html lang="vi" class=""><head>
-<meta charset="utf-8"><title>Đang mở Facebook…</title>
-<script>(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();</script>
+<meta charset="utf-8"><title>Opening Facebook…</title>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t!=='light')document.documentElement.classList.add('dark');}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/public/tailwind.css">
@@ -1182,25 +1182,25 @@ app.get<{ Querystring: { url?: string } }>('/fb-launcher', async (req, reply) =>
 </head><body class="bg-background text-foreground min-h-screen flex items-center justify-center p-4">
 <div class="ui-card max-w-lg w-full p-8 text-center">
   <div id="entryForm">
-    <h1 class="text-xl font-semibold tracking-tight m-0 mb-2">📱 Mở Facebook trên VPS</h1>
-    <p class="text-sm text-muted-foreground mb-5">Chrome sẽ khởi động trên VPS rồi stream về browser này qua noVNC. ~1-2 phút lần đầu.</p>
+    <h1 class="text-xl font-semibold tracking-tight m-0 mb-2">📱 Open Facebook on the VPS</h1>
+    <p class="text-sm text-muted-foreground mb-5">Chrome will launch on the VPS and stream to this browser over noVNC. ~1-2 min the first time.</p>
     <div class="text-left">
-      <label class="block text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">URL group muốn mở thẳng (optional)</label>
+      <label class="block text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Group URL to open directly (optional)</label>
       <input id="navUrl" type="text" placeholder="https://www.facebook.com/groups/..." class="form-input w-full mb-1" value="${preselect.replace(/"/g, '&quot;')}">
-      <p class="text-[11px] text-muted-foreground m-0 mb-4">Để trống → mở facebook.com home. Có URL → Chrome mở thẳng group đó, click Join là xong.</p>
+      <p class="text-[11px] text-muted-foreground m-0 mb-4">Leave empty → open the facebook.com home. With a URL → Chrome opens that group directly, just click Join.</p>
     </div>
-    <button id="btnStart" class="btn btn-primary w-full justify-center py-2.5">🚀 Bắt đầu</button>
+    <button id="btnStart" class="btn btn-primary w-full justify-center py-2.5">🚀 Start</button>
   </div>
 
   <div id="progress" class="hidden">
     <div class="spinner"></div>
-    <h1 id="title" class="text-xl font-semibold tracking-tight m-0 mb-2">Đang mở Facebook trên VPS của bạn…</h1>
-    <p class="text-sm text-muted-foreground mb-5">Chrome cần khởi động trên VPS rồi stream về browser này qua noVNC. ~1-2 phút lần đầu.</p>
+    <h1 id="title" class="text-xl font-semibold tracking-tight m-0 mb-2">Opening Facebook on your VPS…</h1>
+    <p class="text-sm text-muted-foreground mb-5">Chrome needs to launch on the VPS and stream to this browser over noVNC. ~1-2 min the first time.</p>
     <div class="bg-muted/50 rounded-md p-4 mb-4 text-sm text-left space-y-1.5">
-      <div class="step text-muted-foreground" id="s1"><span class="inline-block w-5">⏳</span> Gửi lệnh đến cloud</div>
-      <div class="step text-muted-foreground" id="s2"><span class="inline-block w-5">⏳</span> Agent nhận lệnh (đợi heartbeat)</div>
-      <div class="step text-muted-foreground" id="s3"><span class="inline-block w-5">⏳</span> Chrome khởi động</div>
-      <div class="step text-muted-foreground" id="s4"><span class="inline-block w-5">⏳</span> noVNC sẵn sàng</div>
+      <div class="step text-muted-foreground" id="s1"><span class="inline-block w-5">⏳</span> Send command to cloud</div>
+      <div class="step text-muted-foreground" id="s2"><span class="inline-block w-5">⏳</span> Agent receives command (waiting for heartbeat)</div>
+      <div class="step text-muted-foreground" id="s3"><span class="inline-block w-5">⏳</span> Chrome launching</div>
+      <div class="step text-muted-foreground" id="s4"><span class="inline-block w-5">⏳</span> noVNC ready</div>
     </div>
     <div class="text-[11px] font-mono text-primary" id="elapsed">0s</div>
     <div class="text-xs text-destructive mt-3" id="err"></div>
@@ -1240,21 +1240,21 @@ async function launch(navUrl) {
   const poll = setInterval(async () => {
     try {
       const s = await fetch('/api/dashboard/agent/status', {credentials:'same-origin'}).then(r=>r.json());
-      if (!s.installed) { document.getElementById('err').textContent = '❌ Agent chưa cài trên VPS'; clearInterval(poll); return; }
+      if (!s.installed) { document.getElementById('err').textContent = '❌ Agent not installed on the VPS'; clearInterval(poll); return; }
       if (s.pending_commands && s.pending_commands.length === 0 && s.last_command === 'open_login') mark('s2','done');
       if (!s.login_active && s.last_command === 'open_login') { mark('s2','done'); mark('s3','active'); }
       if (s.login_active) {
         mark('s2','done'); mark('s3','done'); mark('s4','active');
         if (s.vnc_public_url && !redirected) {
           redirected = true;
-          setTitle('Đang chuyển sang Facebook…');
+          setTitle('Switching to Facebook…');
           mark('s4','done');
           clearInterval(poll);
           setTimeout(() => { location.href = s.vnc_public_url; }, 600);
         }
       }
     } catch(e) {
-      document.getElementById('err').textContent = '⚠ Lỗi mạng — retry: ' + e.message;
+      document.getElementById('err').textContent = '⚠ Network error — retrying: ' + e.message;
     }
   }, 3000);
 }
@@ -1276,15 +1276,15 @@ function renderApp(): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>auto_facebook · FB Joined Groups</title>
+<title>nextclaw — lead dashboard</title>
 
 <!-- Avoid FOUC: set theme class before paint -->
-<script>(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t!=='light')document.documentElement.classList.add('dark');}catch(e){}})();</script>
 
-<!-- Inter font (shadcn-style typography) -->
+<!-- nextclaw type: Space Grotesk (display) + Inter (body) + Space Mono (data) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
 <!-- Compiled Tailwind CSS (JIT-built via npm run build:css) -->
 <link rel="stylesheet" href="/public/tailwind.css">
@@ -1488,16 +1488,16 @@ function renderApp(): string {
 
 <aside class="bg-card border-r border-border flex flex-col min-h-0 py-4">
   <div class="px-5 pb-4 border-b border-border">
-    <div class="font-semibold text-[15px] tracking-tight text-foreground">auto_facebook</div>
-    <div class="text-[11px] text-muted-foreground mt-0.5">FB Joined Groups · Postgres</div>
+    <div class="flex items-center gap-2 text-[16px] tracking-tight text-foreground" style="font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;font-weight:700;"><span class="text-primary">◆</span>nextclaw</div>
+    <div class="text-[11px] text-muted-foreground mt-0.5">Catch buyers from Facebook groups</div>
   </div>
   <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-0.5" id="nav">
     <a data-view="dashboard" class="active flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">📊</span><span>Dashboard</span></a>
     <a data-view="discover" id="navDiscover" style="display:none" class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">🔍</span><span>Discover XHR</span></a>
     <a data-view="groups"   class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">👥</span><span>Groups</span></a>
     <a data-view="stream"   class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">📥</span><span>Stream</span></a>
-    <a data-view="compose"  class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">📝</span><span>Đăng bài</span></a>
-    <a data-view="replies"  class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">💬</span><span>Duyệt reply</span></a>
+    <a data-view="compose"  class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">📝</span><span>Compose</span></a>
+    <a data-view="replies"  class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">💬</span><span>Review replies</span></a>
     <a data-view="setup"    class="flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer transition-colors"><span class="text-base">⚙</span><span>Setup</span></a>
   </nav>
   <div class="px-5 py-3 border-t border-border space-y-1 text-[11px] text-muted-foreground">
@@ -1520,7 +1520,7 @@ function renderApp(): string {
   <div class="view" data-view="dashboard">
     <!-- Status banner -->
     <div id="dashStatusBanner" class="ui-card p-4 mb-4 flex items-center gap-4 text-sm">
-      <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-muted-foreground" id="dashStatusDot"></span><span class="text-muted-foreground" id="dashStatusText">Đang tải agent status…</span></div>
+      <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-muted-foreground" id="dashStatusDot"></span><span class="text-muted-foreground" id="dashStatusText">Loading agent status…</span></div>
       <span class="flex-1"></span>
       <span class="text-xs text-muted-foreground" id="dashNextCron"></span>
     </div>
@@ -1531,7 +1531,7 @@ function renderApp(): string {
     <!-- Lead pipeline KPI -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
       <div class="ui-card p-5">
-        <div class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tổng leads tháng này</div>
+        <div class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Total leads this month</div>
         <div class="mt-2 text-3xl font-bold tracking-tight" id="kpiLeadsMonth">…</div>
         <div class="text-xs text-muted-foreground mt-1" id="kpiLeadsDelta"></div>
       </div>
@@ -1550,9 +1550,9 @@ function renderApp(): string {
     <!-- INSIGHTS — condensed current week (full version expandable) -->
     <div class="ui-card p-5 mt-4">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="m-0 text-sm font-semibold">💡 Insight tuần này <span class="text-xs font-normal text-muted-foreground" id="dashInsightWeek"></span></h3>
+        <h3 class="m-0 text-sm font-semibold">💡 This week's insights <span class="text-xs font-normal text-muted-foreground" id="dashInsightWeek"></span></h3>
         <div class="flex items-center gap-2">
-          <button id="btnDashInsightExpand" class="btn btn-ghost text-xs hidden">⤡ Mở rộng</button>
+          <button id="btnDashInsightExpand" class="btn btn-ghost text-xs hidden">⤡ Expand</button>
           <button id="btnDashInsightGen" class="btn btn-secondary text-xs">⚡ Generate</button>
         </div>
       </div>
@@ -1562,25 +1562,25 @@ function renderApp(): string {
 
     <!-- TREND CHARTS -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">📈 Daily leads (30 ngày)</h3><canvas id="chartDaily" style="max-height:240px"></canvas></div>
-      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">🪜 Funnel theo stage</h3><canvas id="chartFunnel" style="max-height:240px"></canvas></div>
-      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">⏱ Velocity (avg ngày/stage)</h3><canvas id="chartVelocity" style="max-height:240px"></canvas></div>
-      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">🔥 Heatmap (giờ × thứ)</h3><div id="heatmapBox" class="overflow-auto" style="max-height:240px"></div></div>
+      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">📈 Daily leads (30 days)</h3><canvas id="chartDaily" style="max-height:240px"></canvas></div>
+      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">🪜 Funnel by stage</h3><canvas id="chartFunnel" style="max-height:240px"></canvas></div>
+      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">⏱ Velocity (avg days/stage)</h3><canvas id="chartVelocity" style="max-height:240px"></canvas></div>
+      <div class="ui-card p-5"><h3 class="m-0 mb-3 text-sm font-semibold">🔥 Heatmap (hour × day)</h3><div id="heatmapBox" class="overflow-auto" style="max-height:240px"></div></div>
     </div>
 
     <!-- Recent ETL activity -->
     <div class="ui-card p-5 mt-4">
-      <h3 class="m-0 mb-3 text-sm font-semibold">⏱ Hoạt động crawl gần nhất</h3>
+      <h3 class="m-0 mb-3 text-sm font-semibold">⏱ Recent crawl activity</h3>
       <table id="recentRuns"><thead><tr><th>kind</th><th>scope</th><th>started</th><th>status</th><th class="num">rows</th><th>message</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 
-  <!-- SETUP (gộp FB Login + Settings + ETL Runs với 3 sub-section pills) -->
+  <!-- SETUP (merges FB Login + Settings + ETL Runs with 3 sub-section pills) -->
   <div class="view hidden" data-view="setup">
     <div class="inline-flex rounded-md border border-border overflow-hidden mb-4" id="setupPills">
-      <button data-setup-section="connection" class="setup-pill px-4 py-2 text-sm font-medium bg-accent text-foreground">🔌 Kết nối</button>
-      <button data-setup-section="config"     class="setup-pill px-4 py-2 text-sm font-medium bg-card text-muted-foreground hover:bg-accent">⚙ Cấu hình</button>
-      <button data-setup-section="activity"   class="setup-pill px-4 py-2 text-sm font-medium bg-card text-muted-foreground hover:bg-accent">📊 Hoạt động (ETL)</button>
+      <button data-setup-section="connection" class="setup-pill px-4 py-2 text-sm font-medium bg-accent text-foreground">🔌 Connection</button>
+      <button data-setup-section="config"     class="setup-pill px-4 py-2 text-sm font-medium bg-card text-muted-foreground hover:bg-accent">⚙ Config</button>
+      <button data-setup-section="activity"   class="setup-pill px-4 py-2 text-sm font-medium bg-card text-muted-foreground hover:bg-accent">📊 Activity (ETL)</button>
     </div>
     <div id="setupBody"><span class="text-xs text-muted-foreground">Loading…</span></div>
   </div>
@@ -1588,30 +1588,30 @@ function renderApp(): string {
   <!-- ====== COMPOSE: Customer-initiated post to group ====== -->
   <div class="view hidden" data-view="compose">
     <div class="ui-card p-5 mb-4">
-      <h3 class="text-base font-semibold mb-3">📝 Đăng bài mới vào group</h3>
+      <h3 class="text-base font-semibold mb-3">📝 Post to a group</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="block text-xs text-muted-foreground mb-1">Group (chỉ group đang enabled)</label>
-          <select id="composeGroup" class="form-input w-full text-sm"><option value="">— chọn group —</option></select>
+          <label class="block text-xs text-muted-foreground mb-1">Group (enabled groups only)</label>
+          <select id="composeGroup" class="form-input w-full text-sm"><option value="">— select a group —</option></select>
         </div>
         <div>
-          <label class="block text-xs text-muted-foreground mb-1">Lịch đăng (để trống = đăng ngay)</label>
+          <label class="block text-xs text-muted-foreground mb-1">Schedule (leave empty = post now)</label>
           <input id="composeSchedule" type="datetime-local" class="form-input w-full text-sm">
         </div>
       </div>
-      <label class="block text-xs text-muted-foreground mb-1">Nội dung bài đăng</label>
-      <textarea id="composeContent" rows="6" placeholder="Viết nội dung bài đăng..." class="form-input w-full text-sm" style="font-family:inherit;"></textarea>
-      <label class="block text-xs text-muted-foreground mb-1 mt-3">Image URLs (mỗi dòng 1 URL, tùy chọn, max 5)</label>
+      <label class="block text-xs text-muted-foreground mb-1">Post content</label>
+      <textarea id="composeContent" rows="6" placeholder="Write the post content..." class="form-input w-full text-sm" style="font-family:inherit;"></textarea>
+      <label class="block text-xs text-muted-foreground mb-1 mt-3">Image URLs (one URL per line, optional, max 5)</label>
       <textarea id="composeImages" rows="3" placeholder="https://example.com/image.jpg" class="form-input w-full text-xs" style="font-family:ui-monospace,monospace;"></textarea>
-      <p class="muted text-[11px] mt-1">⚠ Lần đăng đầu/nhiều bài liên tục có thể bị FB rate-limit. Agent tự detect, status sẽ hiện "rate_limited" — đợi vài giờ rồi thử lại.</p>
+      <p class="muted text-[11px] mt-1">⚠ The first post or many posts in a row may be rate-limited by FB. The agent detects this and the status will show "rate_limited" — wait a few hours and try again.</p>
       <div class="flex gap-2 mt-3">
-        <button id="btnComposeSubmit" class="btn btn-primary">📤 Đăng</button>
+        <button id="btnComposeSubmit" class="btn btn-primary">📤 Post</button>
         <span id="composeMsg" class="muted text-xs self-center"></span>
       </div>
     </div>
     <div class="ui-card p-5">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold m-0">Lịch sử đăng bài</h3>
+        <h3 class="text-base font-semibold m-0">Post history</h3>
         <button id="btnRefreshComposeQueue" class="btn btn-ghost text-xs">↻ Refresh</button>
       </div>
       <div id="composeQueueList"><span class="text-xs text-muted-foreground">Loading…</span></div>
@@ -1621,20 +1621,34 @@ function renderApp(): string {
   <!-- ====== REPLIES: AI-suggested reply queue for manual approve ====== -->
   <div class="view hidden" data-view="replies">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-base font-semibold m-0">💬 Cần duyệt reply</h3>
+      <h3 class="text-base font-semibold m-0">💬 Replies to review</h3>
       <button id="btnRefreshReplies" class="btn btn-ghost text-xs">↻ Refresh</button>
     </div>
-    <p class="muted text-xs mb-4">AI đọc lead + viết suggest reply. Bạn duyệt + edit nếu cần → click "Duyệt + gửi" → agent post comment lên FB. Hoặc skip để bỏ qua.</p>
+    <p class="muted text-xs mb-4">The AI reads the lead and drafts a suggested reply. Review and edit if needed → click "Approve + send" → the agent posts the comment to FB. Or skip it.</p>
     <div id="repliesQueueList"><span class="text-xs text-muted-foreground">Loading…</span></div>
   </div>
 
   <!-- LOGIN — content moved into Setup tab; this view is now a hidden source container that loadSetup() clones from -->
   <div class="hidden" id="srcLogin">
     <div class="panel" id="agentPanel" style="padding: 24px;">
-      <h3 style="margin-top:0">🔌 Kết nối Facebook</h3>
+      <h3 style="margin-top:0">🔌 Connect Facebook</h3>
+
+      <div class="install-card" style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:18px;">
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Install the agent on your VPS</div>
+        <p class="muted" style="font-size:12px; margin:8px 0;">Run this once on your server (Ubuntu 22.04+). It installs everything the agent needs and connects back to nextclaw.</p>
+        <div style="background:#0a0f26; border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-family:'Space Mono',ui-monospace,monospace; font-size:12px; color:#7CE3C4; overflow-x:auto; white-space:nowrap;">
+          <span class="installCmd">curl -fsSL …/install.sh | LICENSE_KEY=… bash</span>
+        </div>
+        <span class="licenseKeyFull hidden"></span>
+        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+          <button class="btn btn-primary text-xs" onclick="navigator.clipboard.writeText(this.closest('.install-card').querySelector('.installCmd').textContent); toast('Install command copied');">Copy install command</button>
+          <button class="btn btn-secondary text-xs" onclick="navigator.clipboard.writeText(this.closest('.install-card').querySelector('.licenseKeyFull').textContent); toast('License key copied');">Copy license key</button>
+        </div>
+      </div>
+
       <div id="agentNotInstalled" class="hidden" style="padding:16px; background:#3a1c28; border-radius:6px; color:#ff9aa3;">
-        <strong>Chưa cài agent trên VPS của bạn.</strong><br>
-        Bạn cần SSH vào VPS rồi chạy lệnh trong welcome email để cài đặt.
+        <strong>Agent not installed yet.</strong><br>
+        SSH into your VPS and run the install command above.
       </div>
       <div id="agentInstalled" class="hidden">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:20px;">
@@ -1650,31 +1664,31 @@ function renderApp(): string {
           </div>
         </div>
 
-        <h4 style="margin:18px 0 8px">Hành động</h4>
+        <h4 style="margin:18px 0 8px">Actions</h4>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
-          <button id="btnOpenFb" class="success">📱 Mở Facebook (join groups)</button>
-          <button id="btnCloseFb" class="danger" disabled>✕ Đóng Facebook</button>
-          <button id="btnDiscoverNow" class="secondary" title="Quét lại danh sách groups đã join (tự đóng FB tab nếu đang mở, ~60s)">🔍 Refresh groups list</button>
-          <button id="btnRunNow" class="secondary" title="Chạy crawl tất cả groups đã enable ngay (không đợi cron */15)">🚀 Chạy crawl ngay</button>
-          <button id="btnResetFingerprint" class="secondary" title="Xoá khoá VPS hiện tại để license dùng được trên máy khác. Chỉ chạy khi agent đã offline >5 phút.">🔓 Reset VPS lock</button>
+          <button id="btnOpenFb" class="success">📱 Open Facebook (join groups)</button>
+          <button id="btnCloseFb" class="danger" disabled>✕ Close Facebook</button>
+          <button id="btnDiscoverNow" class="secondary" title="Re-scan your joined groups list (closes the FB tab if open, ~60s)">🔍 Refresh groups list</button>
+          <button id="btnRunNow" class="secondary" title="Crawl all enabled groups now (do not wait for the */15 cron)">🚀 Run crawl now</button>
+          <button id="btnResetFingerprint" class="secondary" title="Clear the current VPS lock so the license can be used on another machine. Only run when the agent has been offline >5 min.">🔓 Reset VPS lock</button>
         </div>
         <div id="agentMsg" class="muted" style="font-size:12px; min-height:18px;"></div>
 
         <div id="vncReady" class="hidden" style="margin-top:18px; padding:16px; background:#1f3f2a; border-radius:6px;">
-          <strong style="color:#9eecbe;">✓ Chrome đang mở trên VPS</strong><br>
-          <p style="margin:8px 0;">Tab Facebook đã tự động mở. Nếu mất tab, click lại:</p>
-          <a id="vncLink" href="#" target="_blank" rel="noopener" style="display:inline-block; background:#3b6ef0; color:#fff; padding:10px 20px; border-radius:6px; text-decoration:none; font-weight:600;">🚀 Mở lại Facebook tab</a>
+          <strong style="color:#9eecbe;">✓ Chrome is open on the VPS</strong><br>
+          <p style="margin:8px 0;">The Facebook tab opened automatically. If you lost the tab, click again:</p>
+          <a id="vncLink" href="#" target="_blank" rel="noopener" style="display:inline-block; background:#3b6ef0; color:#fff; padding:10px 20px; border-radius:6px; text-decoration:none; font-weight:600;">🚀 Reopen Facebook tab</a>
         </div>
 
         <details style="margin-top:24px;">
-          <summary class="muted" style="cursor:pointer;">Hướng dẫn chi tiết</summary>
+          <summary class="muted" style="cursor:pointer;">Detailed guide</summary>
           <ol style="font-size:13px; color:var(--text-muted); margin-top:8px;">
-            <li><strong>Mở Facebook</strong> → agent khởi động Chrome trên VPS (~10s)</li>
-            <li>Khi sẵn sàng, click <strong>"Mở Facebook tab mới"</strong> → tab mới hiện FB qua noVNC</li>
-            <li>Trong noVNC: login FB (nếu chưa) hoặc click <strong>Groups</strong> → join groups muốn crawl</li>
-            <li>Đóng tab noVNC + click <strong>"Đóng Facebook"</strong> trên dashboard</li>
-            <li>Click <strong>"Refresh groups list"</strong> → groups mới xuất hiện trong tab Groups</li>
-            <li>Enable groups muốn crawl → đợi 2h cron tự crawl (hoặc trigger discover)</li>
+            <li><strong>Open Facebook</strong> → the agent launches Chrome on the VPS (~10s)</li>
+            <li>When ready, click <strong>"Open new Facebook tab"</strong> → a new tab shows FB over noVNC</li>
+            <li>In noVNC: log into FB (if needed) or click <strong>Groups</strong> → join the groups you want to crawl</li>
+            <li>Close the noVNC tab and click <strong>"Close Facebook"</strong> on the dashboard</li>
+            <li>Click <strong>"Refresh groups list"</strong> → new groups appear in the Groups tab</li>
+            <li>Enable the groups you want to crawl → wait for the 2h cron (or trigger discover)</li>
           </ol>
         </details>
       </div>
@@ -1687,7 +1701,7 @@ function renderApp(): string {
       <button id="btnDiscStart">▶ Start discover</button>
       <button class="danger" id="btnDiscStop">■ Stop</button>
       <button class="secondary" id="btnDiscRefresh">↻ Refresh captures</button>
-      <span class="muted" id="discInfo">→ browse vào group đã join, scroll feed, expand comments rồi refresh</span>
+      <span class="muted" id="discInfo">→ browse into a joined group, scroll the feed, expand comments, then refresh</span>
     </div>
     <div class="panel" style="padding: 8px; margin-bottom: 10px;">
       <div class="iframe-wrap" style="height: 68dvh"><iframe id="vncDiscover" src="about:blank"></iframe></div>
@@ -1703,20 +1717,20 @@ function renderApp(): string {
   <!-- GROUPS -->
   <div class="view hidden" data-view="groups">
     <div class="panel">
-      <h3>👥 Joined groups <span class="muted" style="font-weight:400; font-size:11px;">— "scrape on" = scheduler quét group này mỗi 2 giờ.</span></h3>
+      <h3>👥 Joined groups <span class="muted" style="font-weight:400; font-size:11px;">— "scrape on" = the scheduler crawls this group every 2 hours.</span></h3>
       <div class="row-flex" style="margin-bottom:10px; padding:8px 10px; background:var(--bg-hover); border-radius:6px;">
-        <span style="font-size:12px;">💡 Để refresh groups sau khi join thêm trên FB, vào tab <strong>FB Login</strong> → bấm <strong>🔍 Refresh groups list</strong>. Bật ON group nào bạn muốn crawl — cron 30 phút tự lo phần còn lại.</span>
+        <span style="font-size:12px;">💡 To refresh groups after joining more on FB, go to the <strong>FB Login</strong> tab → click <strong>🔍 Refresh groups list</strong>. Turn ON the groups you want to crawl — the 30-min cron handles the rest.</span>
       </div>
       <div id="newGroupsPanel" style="display:none; margin-bottom:10px; padding:10px 12px; background:#1f3f2a; border:1px solid #2a5a3b; border-radius:6px;">
-        <div style="font-size:13px; margin-bottom:8px;">🆕 <strong>Group mới phát hiện (24h gần đây)</strong> — click để enable + backfill</div>
+        <div style="font-size:13px; margin-bottom:8px;">🆕 <strong>Newly discovered groups (last 24h)</strong> — click to enable + backfill</div>
         <div id="newGroupsList"></div>
       </div>
       <div class="row-flex" style="margin-bottom:10px">
-        <input id="groupsQ" placeholder="tìm theo tên group…" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:5px 10px; font-size:12px; width:260px;" />
+        <input id="groupsQ" placeholder="search by group name…" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:5px 10px; font-size:12px; width:260px;" />
         <select id="groupsFilter" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:5px 10px; font-size:12px;">
-          <option value="all">tất cả</option>
-          <option value="on">đang scrape</option>
-          <option value="off">tắt scrape</option>
+          <option value="all">all</option>
+          <option value="on">scraping</option>
+          <option value="off">not scraping</option>
         </select>
         <button class="secondary" id="groupsReload">↻ Reload</button>
         <span class="spacer" style="flex:1"></span>
@@ -1735,14 +1749,14 @@ function renderApp(): string {
     <!-- Shared filter bar -->
     <div class="ui-card p-3 mb-3">
       <div class="flex flex-wrap items-center gap-2">
-        <select id="streamStatus" class="form-input w-auto" title="Lọc theo trạng thái lead">
+        <select id="streamStatus" class="form-input w-auto" title="Filter by lead status">
           <option value="all" selected>📋 All posts</option>
           <option value="leads">🎯 Leads only</option>
           <option value="nonleads">📰 Non-leads</option>
           <optgroup label="— By stage —" id="streamStageOpts"></optgroup>
         </select>
-        <select id="streamGroup" class="form-input w-auto"><option value="">— mọi group —</option></select>
-        <input id="streamQ" placeholder="tìm trong message…" class="form-input flex-1 min-w-[180px] max-w-xs" />
+        <select id="streamGroup" class="form-input w-auto"><option value="">— all groups —</option></select>
+        <input id="streamQ" placeholder="search in message…" class="form-input flex-1 min-w-[180px] max-w-xs" />
         <div class="inline-flex rounded-md border border-border overflow-hidden">
           <button id="streamViewList"  class="px-3 py-1.5 text-xs font-medium bg-accent text-foreground">📋 List</button>
           <button id="streamViewBoard" class="px-3 py-1.5 text-xs font-medium bg-card text-muted-foreground hover:bg-accent">🗂 Board</button>
@@ -1761,20 +1775,20 @@ function renderApp(): string {
       <div class="ui-card p-5">
         <div class="flex flex-wrap items-center gap-2 mb-3">
           <select id="streamPageSize" class="form-input w-auto">
-            <option value="25">25 / trang</option>
-            <option value="50" selected>50 / trang</option>
-            <option value="100">100 / trang</option>
-            <option value="200">200 / trang</option>
+            <option value="25">25 / page</option>
+            <option value="50" selected>50 / page</option>
+            <option value="100">100 / page</option>
+            <option value="200">200 / page</option>
           </select>
-          <button class="btn btn-secondary" id="streamPrev" disabled>← Trước</button>
-          <span class="text-xs text-muted-foreground" id="streamPageInfo">Trang 1</span>
-          <button class="btn btn-secondary" id="streamNext" disabled>Sau →</button>
-          <span class="text-xs text-muted-foreground">· Đến trang:</span>
+          <button class="btn btn-secondary" id="streamPrev" disabled>← Prev</button>
+          <span class="text-xs text-muted-foreground" id="streamPageInfo">Page 1</span>
+          <button class="btn btn-secondary" id="streamNext" disabled>Next →</button>
+          <span class="text-xs text-muted-foreground">· Go to page:</span>
           <input id="streamJumpPage" type="number" min="1" class="form-input" style="width:70px;">
         </div>
         <table id="streamTbl" class="fixed-table">
           <colgroup><col style="width:90px"><col style="width:60px"><col style="width:140px"><col style="width:140px"><col><col style="width:55px"><col style="width:55px"><col style="width:160px"></colgroup>
-          <thead><tr><th>thời gian</th><th>loại</th><th>author</th><th>group</th><th>message</th><th class="num">❤</th><th class="num">💬</th><th>stage</th></tr></thead>
+          <thead><tr><th>time</th><th>type</th><th>author</th><th>group</th><th>message</th><th class="num">❤</th><th class="num">💬</th><th>stage</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -1788,10 +1802,10 @@ function renderApp(): string {
   <!-- ETL — content moved into Setup tab; hidden source container -->
   <div class="hidden" id="srcEtl">
     <div id="etlBanner" class="ui-card border-l-4 border-l-primary p-4 mb-3 text-sm">
-      Đang tải agent status…
+      Loading agent status…
     </div>
     <div class="ui-card p-5">
-      <h3 class="m-0 mb-3 text-sm font-semibold">⏱ ETL runs (50 gần nhất)</h3>
+      <h3 class="m-0 mb-3 text-sm font-semibold">⏱ ETL runs (latest 50)</h3>
       <table id="etlTbl"><thead><tr><th>id</th><th>kind</th><th>scope</th><th>started</th><th>finished</th><th>status</th><th class="num">total</th><th class="num">upsert</th><th>message</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
@@ -1804,14 +1818,14 @@ function renderApp(): string {
       <h3 class="m-0 mb-4 text-base font-semibold">⚙ Settings</h3>
 
       <div class="flex items-center justify-between mt-0 mb-1">
-        <h4 class="text-sm font-semibold m-0">👤 Tài khoản FB (hiển thị trên Dashboard)</h4>
-        <button id="btnFbAutoFetch" class="btn btn-secondary text-xs" title="Agent navigate facebook.com/me → đọc og:title + og:image. Chạy song song với crawl, ~10s.">🔄 Auto-fetch từ VPS</button>
+        <h4 class="text-sm font-semibold m-0">👤 FB account (shown on the Dashboard)</h4>
+        <button id="btnFbAutoFetch" class="btn btn-secondary text-xs" title="The agent navigates to facebook.com/me and reads og:title + og:image. Runs alongside the crawl, ~10s.">🔄 Auto-fetch from VPS</button>
       </div>
-      <p class="text-xs text-muted-foreground mt-1 mb-3">Tên + avatar có thể auto-fetch (agent dùng session đã login) hoặc nhập tay. Agent sẽ tự refresh mỗi 7 ngày.</p>
+      <p class="text-xs text-muted-foreground mt-1 mb-3">Name + avatar can be auto-fetched (the agent uses the logged-in session) or entered by hand. The agent refreshes them every 7 days.</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
         <div>
-          <label class="block text-xs text-muted-foreground mb-1">Tên hiển thị</label>
-          <input id="setFbName" type="text" placeholder="VD: Nguyễn Văn A" class="form-input w-full">
+          <label class="block text-xs text-muted-foreground mb-1">Display name</label>
+          <input id="setFbName" type="text" placeholder="e.g. John Smith" class="form-input w-full">
         </div>
         <div>
           <label class="block text-xs text-muted-foreground mb-1">Avatar URL</label>
@@ -1820,14 +1834,14 @@ function renderApp(): string {
       </div>
 
       <h4 class="text-sm font-semibold mt-0 mb-1">📱 Telegram notification</h4>
-      <p class="muted" style="font-size: 13px;">Mỗi lead mới được Gemini phân loại sẽ ping về Telegram bot của bạn để Sale tiếp cận ngay. Cần tạo bot riêng qua <code>@BotFather</code>. 💡 <i>Có thể bỏ qua bước này và setup sau — lead vẫn xem được trong tab <strong>Stream</strong>.</i></p>
+      <p class="muted" style="font-size: 13px;">Every new lead that Gemini classifies pings your Telegram bot so Sales can reach out right away. You need your own bot via <code>@BotFather</code>. 💡 <i>You can skip this step and set it up later — leads are still visible in the <strong>Stream</strong> tab.</i></p>
 
       <details style="margin: 12px 0; background:var(--bg-card); padding:12px; border-radius:6px;">
-        <summary style="cursor:pointer; font-weight:600;">Hướng dẫn 3 bước tạo bot</summary>
+        <summary style="cursor:pointer; font-weight:600;">3-step guide to create a bot</summary>
         <ol style="margin-top:10px; font-size:13px;">
-          <li><strong>Tạo bot</strong>: Mở Telegram → search <code>@BotFather</code> → gửi <code>/newbot</code> → đặt tên + username → copy <b>token</b> dạng <code>123456:ABC...</code></li>
-          <li><strong>Start bot</strong>: Tìm bot vừa tạo trong Telegram → bấm <b>Start</b> (gửi <code>/start</code>). Nếu muốn gửi vào group, add bot vào group + gửi 1 tin nhắn bất kỳ.</li>
-          <li><strong>Paste token + click 🔍 Detect</strong> — hệ thống tự lấy chat ID từ Telegram, không cần copy thủ công.</li>
+          <li><strong>Create the bot</strong>: Open Telegram → search <code>@BotFather</code> → send <code>/newbot</code> → set a name + username → copy the <b>token</b> like <code>123456:ABC...</code></li>
+          <li><strong>Start the bot</strong>: Find the bot you just created in Telegram → tap <b>Start</b> (send <code>/start</code>). To send into a group, add the bot to the group and send any message.</li>
+          <li><strong>Paste the token + click 🔍 Detect</strong> — the system pulls the chat ID from Telegram automatically, no manual copying.</li>
         </ol>
       </details>
 
@@ -1839,21 +1853,21 @@ function renderApp(): string {
         </div>
 
         <div id="setTgChatBox" style="margin-top:10px; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:5px; font-size:13px; color:var(--text-muted);">
-          Chưa detect — paste token rồi bấm <b>🔍 Detect chat</b>
+          Not detected yet — paste the token and click <b>🔍 Detect chat</b>
         </div>
         <input id="setTgChat" type="hidden">
 
-        <label style="display:block; font-size:12px; color:var(--text-muted); margin-top:14px; margin-bottom:4px;">Topics (route lead theo loại)</label>
+        <label style="display:block; font-size:12px; color:var(--text-muted); margin-top:14px; margin-bottom:4px;">Topics (route leads by type)</label>
         <div style="display:flex; gap:8px; margin-bottom:8px;">
           <select id="setTgTopicHr" style="flex:1; background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:8px 12px; font-size:13px;">
-            <option value="">— Lead HR (tuyển dụng) — General —</option>
+            <option value="">— HR leads (recruiting) — General —</option>
           </select>
           <select id="setTgTopicFulfill" style="flex:1; background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:8px 12px; font-size:13px;">
-            <option value="">— Lead fulfill (sup/xưởng) — General —</option>
+            <option value="">— Fulfillment leads (supplier/factory) — General —</option>
           </select>
           <button id="btnTgDetectTopics" class="secondary" style="white-space:nowrap;">🔍 Detect topics</button>
         </div>
-        <p class="muted" style="font-size:11px; margin:0 0 14px;">Bot phải đã được add vào group + đã thấy ≥1 message ở mỗi topic. Bấm Detect để load list.</p>
+        <p class="muted" style="font-size:11px; margin:0 0 14px;">The bot must already be added to the group and have seen ≥1 message in each topic. Click Detect to load the list.</p>
 
         <div style="margin-top:18px; display:flex; gap:10px;">
           <button class="success" id="btnSettingsSave">💾 Save</button>
@@ -1864,83 +1878,83 @@ function renderApp(): string {
 
       <h4 style="margin-top:32px;">🤖 AI classifier</h4>
       <div style="margin-top:8px; display:flex; gap:12px; align-items:center;">
-        <label><input type="checkbox" id="setClsEnabled"> Bật Gemini phân loại lead</label>
+        <label><input type="checkbox" id="setClsEnabled"> Enable Gemini lead classification</label>
         <span class="muted" style="font-size:12px;">model: gemini-2.5-flash</span>
       </div>
 
       <div style="margin-top:14px;">
-        <label class="block text-xs text-muted-foreground mb-1">Gemini API key (của bạn — để trống = dùng key hệ thống, sẽ tính chung quota của admin)</label>
-        <input id="setGeminiKey" type="password" autocomplete="off" placeholder="AIzaSy… (lấy ở Google AI Studio)" class="form-input w-full" style="font-family:ui-monospace,monospace;">
-        <p class="muted" style="font-size:11px; margin-top:4px;">Đặt key riêng để bill về tài khoản Google của bạn. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:hsl(var(--primary)); text-decoration:underline;">Lấy key tại Google AI Studio</a> (free 1500 req/ngày). Cost ước tính hiển thị ở panel "💰 Chi phí Gemini AI" bên dưới.</p>
+        <label class="block text-xs text-muted-foreground mb-1">Gemini API key (yours — leave empty = use the system key, which shares the admin quota)</label>
+        <input id="setGeminiKey" type="password" autocomplete="off" placeholder="AIzaSy… (get it from Google AI Studio)" class="form-input w-full" style="font-family:ui-monospace,monospace;">
+        <p class="muted" style="font-size:11px; margin-top:4px;">Set your own key to bill against your Google account. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:hsl(var(--primary)); text-decoration:underline;">Get a key at Google AI Studio</a> (free 1500 req/day). Estimated cost is shown in the "💰 Gemini AI cost" panel below.</p>
       </div>
 
-      <h4 style="margin-top:24px;">📝 Tiêu chí lead của shop (rule cho AI)</h4>
-      <p class="muted" style="font-size:13px;">Viết bằng tiếng Việt thông thường mô tả shop bạn + post NÀO được tính là lead. AI sẽ đọc rule này CÙNG với mỗi post FB để quyết định. Nếu để trống → dùng logic mặc định (7 intent cố định).</p>
+      <h4 style="margin-top:24px;">📝 Your shop's lead criteria (rules for the AI)</h4>
+      <p class="muted" style="font-size:13px;">Describe your shop in plain language + WHICH posts count as a lead. The AI reads these rules ALONGSIDE each FB post to decide. Leave empty → use the default logic (7 fixed intents).</p>
       <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-        <label style="font-size:12px; color:var(--text-muted);">🎯 Chọn template:</label>
+        <label style="font-size:12px; color:var(--text-muted);">🎯 Pick a template:</label>
         <select id="leadRuleTemplate" class="form-input" style="font-size:12px; padding:4px 8px; width:auto;">
-          <option value="">-- Tự viết --</option>
-          <option value="pod">In áo POD / Print on demand</option>
+          <option value="">-- Write your own --</option>
+          <option value="pod">POD apparel / Print on demand</option>
           <option value="mmo">MMO / Dropshipping</option>
-          <option value="bds">Bất động sản</option>
-          <option value="tuyendung">Tuyển dụng / Headhunt</option>
-          <option value="dichvu">Dịch vụ in ấn / sản xuất</option>
-          <option value="spa">Spa / Làm đẹp</option>
-          <option value="fnb">F&amp;B / Nhà hàng</option>
+          <option value="bds">Real estate</option>
+          <option value="tuyendung">Recruiting / Headhunt</option>
+          <option value="dichvu">Printing / manufacturing services</option>
+          <option value="spa">Spa / Beauty</option>
+          <option value="fnb">F&amp;B / Restaurant</option>
         </select>
-        <span class="muted" style="font-size:11px;">→ tự fill textarea (chỉ khi đang trống)</span>
+        <span class="muted" style="font-size:11px;">→ auto-fills the textarea (only when empty)</span>
       </div>
-      <textarea id="setLeadRules" rows="8" placeholder="Chọn template ở trên hoặc viết mô tả ngắn về shop bạn + post nào được tính là lead..." style="width:100%; min-height:150px; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:5px; color:var(--text); font-family:inherit; font-size:13px; line-height:1.5; resize:vertical;"></textarea>
+      <textarea id="setLeadRules" rows="8" placeholder="Pick a template above or write a short description of your shop + which posts count as a lead..." style="width:100%; min-height:150px; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:5px; color:var(--text); font-family:inherit; font-size:13px; line-height:1.5; resize:vertical;"></textarea>
       <div style="margin-top:8px; display:flex; gap:24px; align-items:center; flex-wrap:wrap;">
         <label style="font-size:12px; color:var(--text-muted);">Min confidence:
           <input id="setMinConf" type="range" min="0" max="100" step="5" style="vertical-align:middle; margin-left:6px;">
           <span id="setMinConfV" style="font-family:ui-monospace,monospace; color:hsl(var(--primary)); margin-left:6px;">0%</span>
         </label>
-        <label style="font-size:12px; color:var(--text-muted);">Chỉ lead trong:
+        <label style="font-size:12px; color:var(--text-muted);">Only leads within:
           <input id="setMaxAge" type="number" min="0" max="365" style="width:60px; padding:4px 8px; margin-left:6px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; color:var(--text); font-family:ui-monospace,monospace; font-size:13px;">
-          <span class="muted" style="font-size:12px; margin-left:4px;">ngày gần nhất (0 = không giới hạn)</span>
+          <span class="muted" style="font-size:12px; margin-left:4px;">most recent days (0 = no limit)</span>
         </label>
-        <label style="font-size:12px; color:var(--text-muted);">Chống trùng (dedup):
+        <label style="font-size:12px; color:var(--text-muted);">Dedup:
           <input id="setDedupDays" type="number" min="0" max="90" style="width:60px; padding:4px 8px; margin-left:6px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; color:var(--text); font-family:ui-monospace,monospace; font-size:13px;">
-          <span class="muted" style="font-size:12px; margin-left:4px;">ngày (0 = tắt)</span>
+          <span class="muted" style="font-size:12px; margin-left:4px;">days (0 = off)</span>
         </label>
       </div>
-      <p class="muted" style="font-size:11px; margin-top:6px;">Posts cũ hơn N ngày sẽ bị skip — không gọi Gemini, không tạo lead. Tránh tạo lead từ bài đăng cũ.</p>
-      <p class="muted" style="font-size:11px; margin-top:4px;">Chống trùng: nếu cùng 1 tác giả đăng lại bài giống hệt trong N ngày, chỉ tính 1 lead (bỏ qua bài đăng lại — không bắn Telegram). Tránh spam khi nhà tuyển dụng đăng lại liên tục.</p>
+      <p class="muted" style="font-size:11px; margin-top:6px;">Posts older than N days are skipped — no Gemini call, no lead created. Avoids creating leads from old posts.</p>
+      <p class="muted" style="font-size:11px; margin-top:4px;">Dedup: if the same author reposts an identical post within N days, it counts as only 1 lead (the repost is ignored — no Telegram ping). Avoids spam when recruiters repost repeatedly.</p>
 
       <!-- ─── Auto-reply (AI suggest comment) ──────────────────────────── -->
       <div class="mt-6 pt-5 border-t border-border">
         <div class="flex items-center justify-between mb-1">
-          <h4 class="text-sm font-semibold m-0">💬 Auto-reply (AI gợi ý comment)</h4>
+          <h4 class="text-sm font-semibold m-0">💬 Auto-reply (AI-suggested comment)</h4>
           <label class="flex items-center gap-2 text-xs cursor-pointer">
             <input id="setAutoReplyEnabled" type="checkbox" class="form-checkbox">
-            <span>Bật AI suggest</span>
+            <span>Enable AI suggest</span>
           </label>
         </div>
-        <p class="muted text-[11px] mb-3">Khi bật, mỗi lead mới được Gemini soạn 1 reply mẫu → bạn duyệt + chỉnh sửa ở tab <strong>💬 Duyệt reply</strong> trước khi gửi lên FB. KHÔNG tự động gửi (chống ban acc).</p>
-        <label class="block text-xs muted mb-1">Intent áp dụng (cách bằng dấu phẩy, để trống = tất cả lead)</label>
-        <input id="setAutoReplyIntents" type="text" placeholder="vd: hỏi giá, tìm sup, request_quote" class="form-input w-full text-sm mb-2">
-        <label class="block text-xs muted mb-1">Mô tả shop cho AI (tùy chọn, fallback dùng "Lead Rules" ở trên)</label>
-        <textarea id="setAutoReplyShopContext" rows="3" placeholder="VD: Shop chuyên cung cấp sỉ thời trang nữ, giao Toàn quốc, freeship đơn ≥ 500k..." class="form-input w-full text-sm" style="font-family:inherit;"></textarea>
+        <p class="muted text-[11px] mb-3">When enabled, Gemini drafts a sample reply for each new lead → you review and edit it in the <strong>💬 Review replies</strong> tab before sending to FB. It does NOT send automatically (to avoid account bans).</p>
+        <label class="block text-xs muted mb-1">Intents to apply (comma-separated, empty = all leads)</label>
+        <input id="setAutoReplyIntents" type="text" placeholder="e.g. asking for price, find supplier, request_quote" class="form-input w-full text-sm mb-2">
+        <label class="block text-xs muted mb-1">Shop description for the AI (optional, falls back to "Lead Rules" above)</label>
+        <textarea id="setAutoReplyShopContext" rows="3" placeholder="e.g. We wholesale women's fashion, ship nationwide, free shipping on orders ≥ 500k..." class="form-input w-full text-sm" style="font-family:inherit;"></textarea>
         <div class="grid grid-cols-2 gap-3 mt-3">
-          <label class="text-xs muted">Max posts / ngày<input id="setMaxPostsPerDay" type="number" min="0" max="500" class="form-input w-full text-sm mt-1"></label>
-          <label class="text-xs muted">Max replies / ngày<input id="setMaxRepliesPerDay" type="number" min="0" max="500" class="form-input w-full text-sm mt-1"></label>
+          <label class="text-xs muted">Max posts / day<input id="setMaxPostsPerDay" type="number" min="0" max="500" class="form-input w-full text-sm mt-1"></label>
+          <label class="text-xs muted">Max replies / day<input id="setMaxRepliesPerDay" type="number" min="0" max="500" class="form-input w-full text-sm mt-1"></label>
         </div>
       </div>
 
       <!-- ─── Block list (suppress lead alerts per company / author) ───── -->
       <div class="mt-6 pt-5 border-t border-border">
         <div class="flex items-center justify-between mb-1">
-          <h4 class="text-sm font-semibold m-0">🚫 Blocklist — bỏ qua lead từ công ty / tác giả này</h4>
+          <h4 class="text-sm font-semibold m-0">🚫 Blocklist — skip leads from these companies / authors</h4>
           <button id="btnReloadBlocklist" class="btn btn-ghost text-xs">↻</button>
         </div>
-        <p class="muted text-[11px] mb-3">Tap <code>🚫 Block</code> trong Telegram → tự thêm vào đây. Hoặc thêm thủ công:</p>
+        <p class="muted text-[11px] mb-3">Tap <code>🚫 Block</code> in Telegram → it is added here automatically. Or add manually:</p>
         <div class="flex gap-2 mb-3">
           <select id="blkScope" class="form-input text-sm" style="width:120px;">
-            <option value="org">Tên cty</option>
+            <option value="org">Company name</option>
             <option value="author">FB author_id</option>
           </select>
-          <input id="blkPattern" type="text" placeholder="vd: HUTATO" class="form-input flex-1 text-sm">
+          <input id="blkPattern" type="text" placeholder="e.g. HUTATO" class="form-input flex-1 text-sm">
           <button id="btnAddBlock" class="btn btn-secondary text-sm">+ Add</button>
         </div>
         <div id="blocklistTable"><span class="muted text-xs">Loading…</span></div>
@@ -1948,34 +1962,34 @@ function renderApp(): string {
 
       <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="success" id="btnSettingsSave2">💾 Save rules + classifier</button>
-        <button class="danger" id="btnReclassifyAll" title="Xoá tất cả lead hiện tại + re-classify mọi post với rule mới (tốn Gemini quota)">🔄 Re-classify all posts</button>
+        <button class="danger" id="btnReclassifyAll" title="Delete all current leads and re-classify every post with the new rules (uses Gemini quota)">🔄 Re-classify all posts</button>
         <span id="settingsMsg2" class="muted" style="align-self:center; font-size:12px;"></span>
       </div>
 
       <!-- ─── Gemini cost & token usage ─────────────────────────────────── -->
       <div class="mt-8 pt-6 border-t border-border">
         <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-semibold m-0">💰 Chi phí Gemini AI</h4>
+          <h4 class="text-sm font-semibold m-0">💰 Gemini AI cost</h4>
           <div class="flex items-center gap-2">
             <select id="geminiUsageDays" class="form-input text-xs" style="padding:4px 8px;">
-              <option value="7">7 ngày</option>
-              <option value="14" selected>14 ngày</option>
-              <option value="30">30 ngày</option>
-              <option value="90">90 ngày</option>
+              <option value="7">7 days</option>
+              <option value="14" selected>14 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
             </select>
             <button id="btnReloadGeminiUsage" class="btn btn-secondary text-xs">🔄</button>
           </div>
         </div>
-        <p class="text-xs text-muted-foreground mb-3">Số token + chi phí ước tính cho từng ngày. Lưu mỗi lần gọi Gemini (classifier lead + comment analyzer). Giá có thể chỉnh qua env <code>GEMINI_PRICE_INPUT_USD_PER_1M</code> / <code>GEMINI_PRICE_OUTPUT_USD_PER_1M</code> / <code>GEMINI_USD_VND</code>.</p>
+        <p class="text-xs text-muted-foreground mb-3">Tokens + estimated cost per day. Logged on every Gemini call (lead classifier + comment analyzer). Prices can be adjusted via the env vars <code>GEMINI_PRICE_INPUT_USD_PER_1M</code> / <code>GEMINI_PRICE_OUTPUT_USD_PER_1M</code> / <code>GEMINI_USD_VND</code>.</p>
         <div id="geminiUsageTotals" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3"></div>
         <div class="overflow-x-auto">
           <table class="w-full text-xs" id="geminiUsageTable">
             <thead><tr class="text-left text-muted-foreground border-b border-border">
-              <th class="py-2 pr-3">Ngày</th>
+              <th class="py-2 pr-3">Day</th>
               <th class="py-2 pr-3 text-right">Calls</th>
               <th class="py-2 pr-3 text-right">Input tok</th>
               <th class="py-2 pr-3 text-right">Output tok</th>
-              <th class="py-2 pr-3 text-right">Tổng tok</th>
+              <th class="py-2 pr-3 text-right">Total tok</th>
               <th class="py-2 pr-3 text-right">USD</th>
               <th class="py-2 pr-3 text-right">VND</th>
             </tr></thead>
@@ -1983,7 +1997,7 @@ function renderApp(): string {
           </table>
         </div>
         <div class="mt-4">
-          <h5 class="text-xs font-semibold text-muted-foreground uppercase mb-2">Theo mục đích</h5>
+          <h5 class="text-xs font-semibold text-muted-foreground uppercase mb-2">By purpose</h5>
           <table class="w-full text-xs" id="geminiPurposeTable">
             <thead><tr class="text-left text-muted-foreground border-b border-border">
               <th class="py-2 pr-3">Purpose</th>
@@ -2059,7 +2073,7 @@ async function getJson(path){
 }
 
 // ── Tab routing
-const TITLES = { dashboard: 'Dashboard', discover: 'Discover XHR', groups: 'Groups', stream: 'Stream', compose: 'Đăng bài', replies: 'Duyệt reply', setup: 'Setup' };
+const TITLES = { dashboard: 'Dashboard', discover: 'Discover XHR', groups: 'Groups', stream: 'Stream', compose: 'Compose', replies: 'Review replies', setup: 'Setup' };
 function switchView(name){
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('hidden', v.dataset.view !== name));
   document.querySelectorAll('nav#nav a').forEach(a => a.classList.toggle('active', a.dataset.view === name));
@@ -2091,23 +2105,23 @@ function card(label, value, sub){
 
 /**
  * Session health card — answers "is my FB scraping still working?".
- * Buckets session age into Fresh (<14d) / Stable (14-45d) / Sắp hết (>45d).
+ * Buckets session age into Fresh (<14d) / Stable (14-45d) / Expiring soon (>45d).
  * FB cookies typically expire ~60-90 days after last use, so 45d is a useful
  * yellow flag for sale to plan re-login on noVNC before downtime.
  */
 function sessionCard(sess){
   if (!sess) {
     return '<div class="ui-card p-5">' +
-      '<div class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tài khoản Facebook</div>' +
-      '<div class="mt-2 text-base font-semibold text-destructive">⚠ Chưa đăng nhập</div>' +
-      '<div class="text-xs text-muted-foreground mt-1">Vào tab <strong>FB Login</strong> để đăng nhập</div>' +
+      '<div class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Facebook account</div>' +
+      '<div class="mt-2 text-base font-semibold text-destructive">⚠ Not logged in</div>' +
+      '<div class="text-xs text-muted-foreground mt-1">Go to the <strong>FB Login</strong> tab to log in</div>' +
     '</div>';
   }
   const ageDays = sess.created_at ? Math.floor((Date.now() - new Date(sess.created_at).getTime()) / 86_400_000) : 0;
   let pill, hint;
-  if (ageDays < 14)      { pill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-500">● Fresh</span>'; hint = 'Cookies còn fresh — crawl ổn định'; }
-  else if (ageDays < 45) { pill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-500">● Stable</span>'; hint = 'Hoạt động bình thường'; }
-  else                   { pill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-500">● Sắp hết hạn</span>'; hint = 'Nên re-login để tránh gián đoạn'; }
+  if (ageDays < 14)      { pill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-500">● Fresh</span>'; hint = 'Cookies are fresh — crawl is stable'; }
+  else if (ageDays < 45) { pill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-500">● Stable</span>'; hint = 'Working normally'; }
+  else                   { pill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-500">● Expiring soon</span>'; hint = 'Re-login soon to avoid downtime'; }
   const cuser      = String(sess.c_user || '');
   const profileUrl = cuser ? 'https://www.facebook.com/' + cuser : null;
   const hasName    = !!sess.display_name;
@@ -2122,16 +2136,16 @@ function sessionCard(sess){
     ? '<img src="' + esc(sess.avatar_url) + '" class="w-10 h-10 rounded-full object-cover bg-muted" alt="avatar" onerror="this.replaceWith(Object.assign(document.createElement(\\'div\\'),{className:\\'w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold\\',innerText:\\'' + esc(initials) + '\\'}))" />'
     : '<div class="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">' + esc(initials) + '</div>';
   const cta = hasName ? '' :
-    '<a href="#settings" class="block text-[10px] text-primary hover:underline mt-1">→ Nhập tên + avatar trong Settings</a>';
+    '<a href="#settings" class="block text-[10px] text-primary hover:underline mt-1">→ Enter name + avatar in Settings</a>';
   return '<div class="ui-card p-5">' +
-    '<div class="flex items-center justify-between mb-3"><div class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tài khoản Facebook</div>' + pill + '</div>' +
+    '<div class="flex items-center justify-between mb-3"><div class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Facebook account</div>' + pill + '</div>' +
     '<div class="flex items-center gap-3">' +
       avatarEl +
       '<div class="min-w-0 flex-1">' +
         '<div class="text-sm font-semibold truncate">' +
           (profileUrl ? '<a href="' + esc(profileUrl) + '" target="_blank" class="text-foreground hover:text-primary">' + esc(name) + ' ↗</a>' : esc(name)) +
         '</div>' +
-        '<div class="text-[11px] text-muted-foreground truncate">Login ' + ageDays + ' ngày trước · ' + esc(hint) + '</div>' +
+        '<div class="text-[11px] text-muted-foreground truncate">Logged in ' + ageDays + ' days ago · ' + esc(hint) + '</div>' +
         cta +
       '</div>' +
     '</div>' +
@@ -2144,10 +2158,10 @@ async function loadDashboard(){
   const jo = s.counts.groups ?? 0;
   $('kpis').innerHTML = [
     sessionCard(s.session),
-    card('Groups đang crawl', en + ' / ' + jo, en === 0 ? 'Chưa bật group nào — vào tab Groups bật ON' : 'đang crawl ' + en + ' / ' + jo + ' đã join'),
-    card('Posts đã thu thập', fmtN(s.counts.posts), 'tổng lifetime'),
-    card('Comments đã thu thập', fmtN(s.counts.comments), 'tổng lifetime'),
-    card('Đồng bộ gần nhất', s.last_sync_at ? fmtAgo(s.last_sync_at) + ' trước' : '—', s.last_sync_at ? fmtTime(s.last_sync_at) : 'chưa có data'),
+    card('Groups crawling', en + ' / ' + jo, en === 0 ? 'No groups enabled yet — turn some ON in the Groups tab' : 'crawling ' + en + ' / ' + jo + ' joined'),
+    card('Posts collected', fmtN(s.counts.posts), 'lifetime total'),
+    card('Comments collected', fmtN(s.counts.comments), 'lifetime total'),
+    card('Last sync', s.last_sync_at ? fmtAgo(s.last_sync_at) + ' ago' : '—', s.last_sync_at ? fmtTime(s.last_sync_at) : 'no data yet'),
   ].join('');
 
   $('recentRuns').querySelector('tbody').innerHTML = (s.recent_runs ?? []).map(r =>
@@ -2195,17 +2209,17 @@ async function loadAgentStatus() {
     const onlineTxt = j.online_status === 'online' ? '🟢 online' : (j.online_status === 'stale' ? '🟡 stale' : '🔴 offline');
     $('agentStatusPill').className = 'pill ' + onlineCls;
     $('agentStatusPill').textContent = onlineTxt;
-    $('agentVersion').textContent = 'v' + (j.agent_version || '?') + ' · last seen ' + (j.last_seen_at ? new Date(j.last_seen_at).toLocaleTimeString('vi-VN') : '—');
+    $('agentVersion').textContent = 'v' + (j.agent_version || '?') + ' · last seen ' + (j.last_seen_at ? new Date(j.last_seen_at).toLocaleTimeString('en-US') : '—');
 
     // FB session pill
     if (j.fb_session_alive) {
       $('fbSessionPill').className = 'pill pill-ok';
-      $('fbSessionPill').textContent = '🟢 Đã login';
+      $('fbSessionPill').textContent = '🟢 Logged in';
     } else {
       $('fbSessionPill').className = 'pill pill-warn';
-      $('fbSessionPill').textContent = '⚠ Chưa login';
+      $('fbSessionPill').textContent = '⚠ Not logged in';
     }
-    $('lastCmd').textContent = j.last_command ? ('Lệnh gần nhất: ' + j.last_command + ' @ ' + (j.last_command_at ? new Date(j.last_command_at).toLocaleTimeString('vi-VN') : '?')) : '';
+    $('lastCmd').textContent = j.last_command ? ('Last command: ' + j.last_command + ' @ ' + (j.last_command_at ? new Date(j.last_command_at).toLocaleTimeString('en-US') : '?')) : '';
 
     // Pending command queue state (FIFO) + crawl in-flight banner
     const pendingList = (j.pending_commands || []).map(p => p.cmd);
@@ -2213,35 +2227,35 @@ async function loadAgentStatus() {
     if (j.online_status !== 'online') {
       // Agent not heartbeating — clear next step instead of fall-through to idle/queue.
       msg = j.online_status === 'stale'
-        ? '🟡 <strong>Agent stale</strong> — heartbeat trễ. Đợi 5-10 phút, nếu chuyển OFFLINE thì SSH vào VPS: <code>systemctl restart auto-facebook-agent</code>'
-        : '🔴 <strong>Agent OFFLINE</strong> — chưa kết nối tới cloud. ' + (j.last_seen_at
-            ? 'Heartbeat cuối: ' + new Date(j.last_seen_at).toLocaleTimeString('vi-VN') + '. Check VPS còn chạy không.'
-            : 'Chạy install.sh trên VPS chưa? Lệnh cài có trong email welcome.');
+        ? '🟡 <strong>Agent stale</strong> — heartbeat is late. Wait 5-10 min; if it goes OFFLINE, SSH into the VPS: <code>systemctl restart auto-facebook-agent</code>'
+        : '🔴 <strong>Agent OFFLINE</strong> — not connected to the cloud. ' + (j.last_seen_at
+            ? 'Last heartbeat: ' + new Date(j.last_seen_at).toLocaleTimeString('en-US') + '. Check whether the VPS is still running.'
+            : 'Have you run install.sh on the VPS yet? The install command is in the welcome email.');
     } else if (j.run_in_flight) {
       const startedAgo = j.run_started_at
         ? Math.round((Date.now() - new Date(j.run_started_at).getTime()) / 1000)
         : 0;
       const mins = Math.floor(startedAgo / 60);
-      const ago  = mins > 0 ? mins + 'p ' + (startedAgo % 60) + 's' : startedAgo + 's';
+      const ago  = mins > 0 ? mins + 'm ' + (startedAgo % 60) + 's' : startedAgo + 's';
       let progress = '';
       if (j.run_groups_total && j.run_groups_total > 0) {
         const pct = Math.round((j.run_groups_done / j.run_groups_total) * 100);
-        const curr = j.run_current_group ? ' · đang xử lý <code>' + esc(j.run_current_group) + '</code>' : '';
+        const curr = j.run_current_group ? ' · processing <code>' + esc(j.run_current_group) + '</code>' : '';
         progress = ' · <strong>' + j.run_groups_done + '/' + j.run_groups_total + '</strong> groups (' + pct + '%)' + curr;
       }
-      msg = '🔄 <strong>Đang crawl (' + (j.run_mode || '?') + ')</strong> — bắt đầu ' + ago + ' trước' + progress + '. Lệnh khác sẽ vào queue.';
+      msg = '🔄 <strong>Crawling (' + (j.run_mode || '?') + ')</strong> — started ' + ago + ' ago' + progress + '. Other commands will queue.';
     } else if (pendingList.length) {
       // Queue waiting → agent will pick up at next heartbeat (≤60s), NOT at
       // next cron. Highlight this so user doesn't think they have to wait.
-      msg = '⏳ <strong>Lệnh trong queue sẽ chạy trong ≤60s</strong> (heartbeat kế): <code>[' + pendingList.join(' → ') + ']</code>';
+      msg = '⏳ <strong>Queued commands will run within ≤60s</strong> (next heartbeat): <code>[' + pendingList.join(' → ') + ']</code>';
     } else {
-      // Cron incr = "*/30 * * * *" → next :00 hoặc :30.
+      // Cron incr = "*/30 * * * *" → next :00 or :30.
       const now = new Date();
       const next = new Date(now);
       next.setSeconds(0, 0);
       next.setMinutes(now.getMinutes() < 30 ? 30 : 60);
       const diffMin = Math.max(1, Math.round((next.getTime() - now.getTime()) / 60000));
-      msg = '✅ Agent idle. Crawl tự động tiếp theo: <strong>' + next.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'}) + '</strong> (trong ' + diffMin + ' phút).';
+      msg = '✅ Agent idle. Next automatic crawl: <strong>' + next.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}) + '</strong> (in ' + diffMin + ' min).';
     }
     $('agentMsg').innerHTML = msg;
 
@@ -2252,7 +2266,7 @@ async function loadAgentStatus() {
     const hasDiscoverQueued = pendingList.includes('discover_now') || pendingList.includes('discover_groups_only');
     $('btnOpenFb').disabled  = j.login_active || hasOpenQueued || j.run_in_flight;
     if (j.run_in_flight && !j.login_active) {
-      $('btnOpenFb').title = 'Crawl đang chạy — đợi xong rồi mở Facebook (tránh conflict chrome-profile)';
+      $('btnOpenFb').title = 'Crawl is running — wait for it to finish before opening Facebook (avoids a chrome-profile conflict)';
     } else {
       $('btnOpenFb').title = '';
     }
@@ -2260,12 +2274,12 @@ async function loadAgentStatus() {
     if ($('btnDiscoverNow')) {
       $('btnDiscoverNow').disabled = j.run_in_flight || hasDiscoverQueued;
       $('btnDiscoverNow').textContent = j.run_in_flight
-        ? '🔄 Crawl đang chạy…'
-        : (hasDiscoverQueued ? '⏳ Đã queue, đợi…' : '🔍 Refresh groups list');
+        ? '🔄 Crawl running…'
+        : (hasDiscoverQueued ? '⏳ Queued, waiting…' : '🔍 Refresh groups list');
     }
     if ($('btnRunNow')) {
       $('btnRunNow').disabled = j.run_in_flight;
-      $('btnRunNow').textContent = j.run_in_flight ? '🔄 Crawl đang chạy…' : '🚀 Chạy crawl ngay';
+      $('btnRunNow').textContent = j.run_in_flight ? '🔄 Crawl running…' : '🚀 Run crawl now';
     }
 
     if (j.login_active && j.vnc_public_url) {
@@ -2280,7 +2294,7 @@ async function loadAgentStatus() {
 }
 
 async function sendAgentCmd(cmd) {
-  $('agentMsg').textContent = '⏳ Đang gửi lệnh "' + cmd + '"…';
+  $('agentMsg').textContent = '⏳ Sending command "' + cmd + '"…';
   try {
     const r = await fetch('/api/dashboard/agent/command', {
       method: 'POST',
@@ -2289,9 +2303,9 @@ async function sendAgentCmd(cmd) {
       body: JSON.stringify({ cmd }),
     });
     const j = await r.json();
-    if (j.ok) { toast('Đã gửi lệnh — agent sẽ thực hiện trong ~60s', 'success'); }
-    else { toast('Lỗi: ' + (j.message || j.error), 'error'); }
-  } catch (e) { toast('Lỗi mạng: ' + e.message, 'error'); }
+    if (j.ok) { toast('Command sent — the agent will run it in ~60s', 'success'); }
+    else { toast('Error: ' + (j.message || j.error), 'error'); }
+  } catch (e) { toast('Network error: ' + e.message, 'error'); }
   loadAgentStatus();
 }
 
@@ -2304,11 +2318,11 @@ $('btnCloseFb').onclick    = () => sendAgentCmd('close_login');
 $('btnDiscoverNow').onclick = () => sendAgentCmd('discover_groups_only');
 $('btnRunNow') && ($('btnRunNow').onclick = () => sendAgentCmd('crawl_now_incr'));
 $('btnResetFingerprint') && ($('btnResetFingerprint').onclick = async () => {
-  if (!confirm('Reset khoá VPS? Lần heartbeat tiếp theo từ bất kỳ máy nào sẽ trở thành máy được lock-in mới.\\n\\nChỉ chạy nếu bạn đang chuyển VPS hoặc đổi hostname.')) return;
+  if (!confirm('Reset the VPS lock? The next heartbeat from any machine will become the new locked-in machine.\\n\\nOnly do this if you are migrating VPS or changing the hostname.')) return;
   const r = await fetch('/api/agent/reset-fingerprint', { method:'POST', credentials:'same-origin' });
   const j = await r.json();
-  if (j.ok) toast('✓ Khoá VPS đã reset (cũ: ' + (j.previous_hostname || '—') + ')', 'success');
-  else      toast('Lỗi: ' + (j.message || j.error), 'error');
+  if (j.ok) toast('✓ VPS lock reset (old: ' + (j.previous_hostname || '—') + ')', 'success');
+  else      toast('Error: ' + (j.message || j.error), 'error');
 });
 
 // Poll agent status every 8s globally (so buttons across tabs reflect live state).
@@ -2339,8 +2353,8 @@ async function loadCaptures(){
   $('sideDisc').textContent = j.running ? 'recording' : 'idle';
   $('sideDisc').className = 'pill ' + (j.running ? 'live' : '');
   $('discInfo').textContent = j.running
-    ? 'Recording → ' + j.runId + '. Browse vào group, scroll, expand comments.'
-    : 'Idle. Click "Start discover" để bắt đầu.';
+    ? 'Recording → ' + j.runId + '. Browse into a group, scroll, expand comments.'
+    : 'Idle. Click "Start discover" to begin.';
   $('discCaps').querySelector('tbody').innerHTML = (j.rows ?? []).map(r =>
     '<tr><td><code>' + esc(r.friendly_name) + '</code></td>' +
     '<td class="num">' + fmtN(r.n) + '</td>' +
@@ -2375,11 +2389,11 @@ async function loadRefreshInfo(){
   if (!j) return;
   const r = j.last;
   if (!r) {
-    $('groupsRefreshInfo').textContent = 'chưa refresh lần nào';
+    $('groupsRefreshInfo').textContent = 'never refreshed';
   } else if (r.status === 'running') {
-    $('groupsRefreshInfo').innerHTML = '<span class="s-running">đang chạy từ ' + esc(fmtAgo(r.started_at)) + ' trước…</span>';
+    $('groupsRefreshInfo').innerHTML = '<span class="s-running">running since ' + esc(fmtAgo(r.started_at)) + ' ago…</span>';
   } else {
-    $('groupsRefreshInfo').textContent = 'lần cuối: ' + fmtAgo(r.finished_at) + ' trước (' + (r.rows_upserted ?? '?') + ' groups)';
+    $('groupsRefreshInfo').textContent = 'last: ' + fmtAgo(r.finished_at) + ' ago (' + (r.rows_upserted ?? '?') + ' groups)';
   }
 }
 
@@ -2393,7 +2407,7 @@ async function loadNewGroups(){
   $('newGroupsList').innerHTML = list.map(r =>
     '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #2a5a3b;">' +
       '<span style="flex:1; font-size:13px;">' + esc(r.name || r.group_id) + '</span>' +
-      '<span class="muted" style="font-size:11px;">' + esc(fmtAgo(r.first_seen_at)) + ' trước</span>' +
+      '<span class="muted" style="font-size:11px;">' + esc(fmtAgo(r.first_seen_at)) + ' ago</span>' +
       '<button class="js-crawl-btn success" onclick="enableAndBackfill(\\'' + esc(r.group_id) + '\\', this)" style="white-space:nowrap;">🚀 Enable + Backfill</button>' +
     '</div>'
   ).join('');
@@ -2403,7 +2417,7 @@ async function enableAndBackfill(gid, btn){
   // on next cron tick (or trigger discover_now from FB Login tab for immediate).
   btn.disabled = true; btn.textContent = '⏳ enabling…';
   await fetch('/api/groups/' + gid, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify({enabled: true}) });
-  toast('Enabled — agent sẽ crawl ở lần tick tiếp theo. Click "🔍 Refresh groups list" trên tab FB Login để crawl ngay.', 'success', 6000);
+  toast('Enabled — the agent will crawl it on the next tick. Click "🔍 Refresh groups list" on the FB Login tab to crawl now.', 'success', 6000);
   loadGroups();
 }
 window.enableAndBackfill = enableAndBackfill;
@@ -2427,11 +2441,11 @@ async function loadGroups(){
     '<td>' + (r.enabled ? '<span class="pill live">scrape on</span>' : '<span class="pill">scrape off</span>') + '</td>' +
     '<td class="muted">' + esc(fmtTime(r.updated_at)) + '</td>' +
     '<td><button class="secondary" onclick="toggleGroup(\\'' + esc(r.group_id) + '\\', ' + (!r.enabled) + ')">' + (r.enabled ? 'turn off' : 'turn on') + '</button></td></tr>'
-  ).join('') || '<tr><td colspan="6" class="muted">không có group nào khớp — thử bỏ search hoặc đổi filter</td></tr>';
+  ).join('') || '<tr><td colspan="6" class="muted">no groups match — try clearing the search or changing the filter</td></tr>';
 
   // counter + paging
   const t = g.totals ?? {}; const p = g.paging ?? {};
-  $('groupsCounter').textContent = (t.enabled ?? 0) + ' / ' + (t.total ?? 0) + ' enabled · filter: ' + (p.total ?? 0) + ' kết quả';
+  $('groupsCounter').textContent = (t.enabled ?? 0) + ' / ' + (t.total ?? 0) + ' enabled · filter: ' + (p.total ?? 0) + ' results';
   const from = (p.total ?? 0) === 0 ? 0 : p.offset + 1;
   const to   = Math.min((p.total ?? 0), p.offset + p.limit);
   $('groupsPageInfo').textContent = from + '–' + to;
@@ -2460,7 +2474,7 @@ function updateGroupsButtonsState() {
     if (inFlight) {
       b.disabled = true;
       if (!b.dataset.origText) b.dataset.origText = b.textContent;
-      b.textContent = '⏸ Đang crawl…';
+      b.textContent = '⏸ Crawling…';
     } else {
       b.disabled = false;
       if (b.dataset.origText) { b.textContent = b.dataset.origText; delete b.dataset.origText; }
@@ -2504,15 +2518,15 @@ async function updateLeadStageInline(sel){
     const j = await r.json();
     if (j.ok) {
       sel.dataset.prev = newStage;
-      toast('Đã chuyển stage → ' + (LEAD_ENUMS.stages.find(s => s.value === newStage)?.label ?? newStage), 'success');
+      toast('Moved stage → ' + (LEAD_ENUMS.stages.find(s => s.value === newStage)?.label ?? newStage), 'success');
       if (typeof refreshStreamKpis === 'function' && typeof isStreamLeadFilter === 'function' && isStreamLeadFilter()) refreshStreamKpis();
     } else {
       sel.value = prev;
-      toast('Lỗi: ' + (j.message || j.error || '?'), 'error');
+      toast('Error: ' + (j.message || j.error || '?'), 'error');
     }
   } catch (e) {
     sel.value = prev;
-    toast('Lỗi mạng: ' + e.message, 'error');
+    toast('Network error: ' + e.message, 'error');
   } finally {
     sel.disabled = false;
   }
@@ -2546,18 +2560,18 @@ function extractPhotosFromRaw(raw, fallback){
 
 // ── Stream tab (unified Posts + Leads + Kanban) ─────────────────────
 const STREAM_STAGES = [
-  ['new',            'Chưa tiếp cận',   '#3b6ef0'],
-  ['contacted',      'Đã liên hệ',       '#5e7be8'],
-  ['info_sent',      'Đã gửi thông tin', 'hsl(var(--primary))'],
-  ['negotiating',    'Đang deal giá',    '#fbbf24'],
-  ['sample_sent',    'Đã gửi mẫu',       '#fbbf24'],
-  ['awaiting_reply', 'Chờ phản hồi',     '#fbbf24'],
-  ['topup_1',        'Topup lần 01',     '#a78bfa'],
-  ['first_order',    'Lên đơn đầu',      '#a78bfa'],
-  ['topup_2',        'Topup lần 02',     '#a78bfa'],
-  ['shipped_sg',     'Chuyển SG',        '#10b981'],
-  ['closed_won',     'Chốt thành công',  '#22c55e'],
-  ['closed_lost',    'Mất lead',         '#ef4444'],
+  ['new',            'New',           '#3b6ef0'],
+  ['contacted',      'Contacted',     '#5e7be8'],
+  ['info_sent',      'Info sent',     'hsl(var(--primary))'],
+  ['negotiating',    'Negotiating',   '#fbbf24'],
+  ['sample_sent',    'Sample sent',   '#fbbf24'],
+  ['awaiting_reply', 'Awaiting reply','#fbbf24'],
+  ['topup_1',        'Top-up 1',      '#a78bfa'],
+  ['first_order',    'First order',   '#a78bfa'],
+  ['topup_2',        'Top-up 2',      '#a78bfa'],
+  ['shipped_sg',     'Shipped',       '#10b981'],
+  ['closed_won',     'Won',           '#22c55e'],
+  ['closed_lost',    'Lost',          '#ef4444'],
 ];
 
 const streamState = { view: 'list', status: 'all', page: 1, group: '', q: '', _initialised: false };
@@ -2584,12 +2598,12 @@ async function refreshStreamKpis(){
   if (!stats) return;
   const c = stats.stages || {};
   $('streamKpis').innerHTML = [
-    card('Mới (chưa tiếp cận)', fmtN(c.new ?? 0), ''),
-    card('Đang xử lý', fmtN((c.contacted||0)+(c.info_sent||0)+(c.negotiating||0)+(c.sample_sent||0)+(c.awaiting_reply||0)), 'contacted → awaiting_reply'),
-    card('Đã đặt hàng', fmtN((c.topup_1||0)+(c.first_order||0)+(c.topup_2||0)+(c.shipped_sg||0)), 'topup → ship'),
-    card('Chốt thành công', fmtN(c.closed_won ?? 0), ''),
-    card('Mất lead', fmtN(c.closed_lost ?? 0), ''),
-    card('Lead 24h gần', fmtN(stats.recent_24h ?? 0), ''),
+    card('New (not contacted)', fmtN(c.new ?? 0), ''),
+    card('In progress', fmtN((c.contacted||0)+(c.info_sent||0)+(c.negotiating||0)+(c.sample_sent||0)+(c.awaiting_reply||0)), 'contacted → awaiting_reply'),
+    card('Ordered', fmtN((c.topup_1||0)+(c.first_order||0)+(c.topup_2||0)+(c.shipped_sg||0)), 'top-up → ship'),
+    card('Won', fmtN(c.closed_won ?? 0), ''),
+    card('Lost', fmtN(c.closed_lost ?? 0), ''),
+    card('Leads (last 24h)', fmtN(stats.recent_24h ?? 0), ''),
   ].join('');
 }
 
@@ -2666,15 +2680,15 @@ async function loadStreamList(){
   if (streamState.page > totalPages) { streamState.page = totalPages; return loadStreamList(); }
   const start = total === 0 ? 0 : offset + 1;
   const end   = Math.min(offset + pageSize, total);
-  $('streamCount').textContent = total + ' tổng · hiển thị ' + start + '-' + end;
-  $('streamPageInfo').textContent = 'Trang ' + streamState.page + ' / ' + totalPages;
+  $('streamCount').textContent = total + ' total · showing ' + start + '-' + end;
+  $('streamPageInfo').textContent = 'Page ' + streamState.page + ' / ' + totalPages;
   $('streamPrev').disabled = streamState.page <= 1;
   $('streamNext').disabled = streamState.page >= totalPages;
   $('streamJumpPage').max = String(totalPages);
   $('streamJumpPage').value = String(streamState.page);
 
   $('streamTbl').querySelector('tbody').innerHTML = (j.rows ?? []).map(r => {
-    const ago = r.detected_at ? fmtAgo(r.detected_at) + ' trước' : (r.created_time ? fmtAgo(r.created_time) + ' trước' : '—');
+    const ago = r.detected_at ? fmtAgo(r.detected_at) + ' ago' : (r.created_time ? fmtAgo(r.created_time) + ' ago' : '—');
     const msg = (r.message ?? '').replace(/\\s+/g, ' ').slice(0, 200);
     const displayName = r.author_name || (r.author_id ? String(r.author_id) : '?');
     const truncated   = displayName.length > 22 ? displayName.slice(0, 22) + '…' : displayName;
@@ -2704,7 +2718,7 @@ async function loadStreamList(){
       '<td class="num">' + fmtN(r.comment_count) + '</td>' +
       '<td>' + stageCell + '</td>' +
     '</tr>';
-  }).join('') || '<tr><td colspan="8" class="muted">không có post nào — thử Reload hoặc đổi filter</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="muted">no posts — try Reload or change the filter</td></tr>';
 }
 
 async function loadStreamBoard(){
@@ -2759,11 +2773,11 @@ async function loadStreamBoard(){
           try {
             const r = await fetch('/api/leads/' + leadId, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify({ stage: newStage }) });
             const j = await r.json();
-            if (!j.ok) throw new Error(j.message || j.error || 'lưu fail');
-            toast('Đã chuyển → ' + (LEAD_ENUMS.stages.find(s => s.value === newStage)?.label ?? newStage), 'success');
+            if (!j.ok) throw new Error(j.message || j.error || 'save failed');
+            toast('Moved → ' + (LEAD_ENUMS.stages.find(s => s.value === newStage)?.label ?? newStage), 'success');
             if (isStreamLeadFilter()) refreshStreamKpis();
           } catch (e) {
-            toast('Lỗi: ' + e.message, 'error');
+            toast('Error: ' + e.message, 'error');
             const oldBody = board.querySelector('.kan-body[data-stage="' + oldStage + '"]');
             if (oldBody) oldBody.appendChild(card);
             recalcStreamCounts(board);
@@ -2775,7 +2789,7 @@ async function loadStreamBoard(){
 }
 
 function renderStreamCard(r) {
-  const intentLabels = {request_quote:'Hỏi giá',question:'Câu hỏi',complaint:'Phàn nàn',showcase:'Khoe',spam:'Spam',seeding:'Seeding',other:'Khác'};
+  const intentLabels = {request_quote:'Asking for price',question:'Question',complaint:'Complaint',showcase:'Showcase',spam:'Spam',seeding:'Seeding',other:'Other'};
   const intentColors = {request_quote:'#22c55e',question:'#3b6ef0',complaint:'#ef4444',showcase:'#a78bfa',spam:'#6b7280',seeding:'#fbbf24',other:'#6b7280'};
   const intColor = intentColors[r.intent] || '#6b7280';
   const displayName = r.author_name || (r.author_id ? String(r.author_id) : '?');
@@ -2787,7 +2801,7 @@ function renderStreamCard(r) {
   const author = linkTarget
     ? '<a href="' + esc(linkTarget) + '" target="_blank" title="' + esc(displayName) + '" onclick="event.stopPropagation()" style="color:hsl(var(--primary)); text-decoration:none;">' + authorInner + '</a>'
     : '<span title="' + esc(displayName) + '">' + authorInner + '</span>';
-  const ago = r.detected_at ? fmtAgo(r.detected_at) + ' trước' : '';
+  const ago = r.detected_at ? fmtAgo(r.detected_at) + ' ago' : '';
   const msg = (r.message ?? '').replace(/\\s+/g, ' ').slice(0, 140);
   const group = (r.group_name || '').slice(0, 28);
   return '<div class="kan-card" data-lead-id="' + r.lead_id + '" onclick="viewItem(\\'' + esc(r.post_id) + '\\', ' + r.lead_id + ')" style="background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:10px; margin-bottom:8px; cursor:grab; font-size:12px;">' +
@@ -2813,7 +2827,7 @@ function recalcStreamCounts(board) {
 async function viewItem(postId, leadIdOpt){
   await ensureLeadEnums();
   const postJ = await getJson('/api/posts/' + encodeURIComponent(postId));
-  if (!postJ?.ok) { toast('Post không tồn tại', 'error'); return; }
+  if (!postJ?.ok) { toast('Post does not exist', 'error'); return; }
   const r = postJ.row;
   const comments = postJ.comments ?? [];
 
@@ -2848,7 +2862,7 @@ async function viewItem(postId, leadIdOpt){
     : authorTxt;
   const initials  = isAnon ? '🎭' : (authorName ? authorName.split(/\\s+/).map(w => w[0]).slice(-2).join('').toUpperCase() : String(r.author_id || '?').slice(-2));
   const photoUrls = extractPhotosFromRaw(r.raw, r.attachment_url);
-  const ago       = r.created_time ? fmtAgo(r.created_time) + ' trước' : '—';
+  const ago       = r.created_time ? fmtAgo(r.created_time) + ' ago' : '—';
   const groupTxt  = r.group_name || r.group_id || '?';
   const msgHtml   = esc(r.message || '').replace(/\\n/g, '<br>');
   const reactN    = Number(r.reaction_count) || 0;
@@ -2863,8 +2877,8 @@ async function viewItem(postId, leadIdOpt){
   html += '<div style="display:flex; align-items:center; gap:10px; padding:12px 14px;">';
   html += '<div style="width:40px; height:40px; border-radius:50%; background:' + (isAnon ? '#3d3a4f' : '#3b6ef0') + '; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:13px; flex-shrink:0;">' + esc(initials) + '</div>';
   html += '<div style="flex:1; min-width:0;"><div style="font-weight:600; font-size:14px;">' + authorLinked + '</div>';
-  html += '<div class="muted" style="font-size:12px;">đăng trong <strong>' + esc(groupTxt) + '</strong> · ' + esc(ago) + (r.created_time ? ' · <span title="' + esc(fmtTime(r.created_time)) + '">🕒</span>' : '') + '</div></div>';
-  html += (r.permalink ? '<a href="' + esc(r.permalink) + '" target="_blank" class="secondary" style="padding:6px 10px; border-radius:5px; color:hsl(var(--primary)); font-size:12px; text-decoration:none; flex-shrink:0;">↗ Mở FB</a>' : '') + '</div>';
+  html += '<div class="muted" style="font-size:12px;">posted in <strong>' + esc(groupTxt) + '</strong> · ' + esc(ago) + (r.created_time ? ' · <span title="' + esc(fmtTime(r.created_time)) + '">🕒</span>' : '') + '</div></div>';
+  html += (r.permalink ? '<a href="' + esc(r.permalink) + '" target="_blank" class="secondary" style="padding:6px 10px; border-radius:5px; color:hsl(var(--primary)); font-size:12px; text-decoration:none; flex-shrink:0;">↗ Open FB</a>' : '') + '</div>';
   html += '<div style="padding:0 14px 14px; font-size:14px; line-height:1.55; white-space:pre-wrap; max-height:400px; overflow-y:auto;">' + msgHtml + '</div>';
   html += (photoUrls.length === 0 ? '' :
      photoUrls.length === 1
@@ -2874,7 +2888,7 @@ async function viewItem(postId, leadIdOpt){
          '</div>');
   html += '<div style="display:flex; gap:18px; padding:10px 14px; border-top:1px solid var(--border-strong); font-size:13px; color:var(--text-muted);">';
   html += '<span>❤️ ' + fmtN(reactN) + '</span><span>💬 ' + fmtN(commN) + '</span><span>↗ ' + fmtN(shareN) + '</span>';
-  html += (ibUrl ? '<a href="' + esc(ibUrl) + '" target="_blank" style="margin-left:auto; color:#9eecbe;">👤 Mở profile (để IB)</a>' : '<span class="muted" style="margin-left:auto;">👤 Profile ẩn (anonymous post)</span>');
+  html += (ibUrl ? '<a href="' + esc(ibUrl) + '" target="_blank" style="margin-left:auto; color:#9eecbe;">👤 Open profile (to DM)</a>' : '<span class="muted" style="margin-left:auto;">👤 Profile hidden (anonymous post)</span>');
   html += '</div></div>';
 
   if (lead) {
@@ -2892,8 +2906,8 @@ async function viewItem(postId, leadIdOpt){
         '<select id="leadStageEdit" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); padding:5px 8px; border-radius:5px; flex:1;">' + stageOpts + '</select>' +
         '<button class="success" onclick="saveItemStage(' + lead.lead_id + ', \\'' + esc(postId) + '\\')">💾 Save</button>' +
       '</div>' +
-      '<textarea id="leadNoteEdit" rows="2" style="width:100%; background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:6px 8px; font-family:inherit; font-size:12px; box-sizing:border-box;" placeholder="thêm note…">' + esc(lead.note || '') + '</textarea>' +
-      '<button class="secondary" style="margin-top:6px; font-size:12px;" onclick="addItemNote(' + lead.lead_id + ', \\'' + esc(postId) + '\\')">+ Thêm note vào history</button>' +
+      '<textarea id="leadNoteEdit" rows="2" style="width:100%; background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:6px 8px; font-family:inherit; font-size:12px; box-sizing:border-box;" placeholder="add a note…">' + esc(lead.note || '') + '</textarea>' +
+      '<button class="secondary" style="margin-top:6px; font-size:12px;" onclick="addItemNote(' + lead.lead_id + ', \\'' + esc(postId) + '\\')">+ Add note to history</button>' +
     '</div>';
     if (history.length) {
       html += '<div style="margin-top:14px;"><div style="font-size:13px; font-weight:600; margin-bottom:6px;">📜 History</div>' +
@@ -2910,12 +2924,12 @@ async function viewItem(postId, leadIdOpt){
     }
   } else {
     html += '<div style="margin-top:14px; padding:10px 12px; background:var(--bg-card); border-radius:6px; font-size:12px; color:var(--text-muted);">' +
-      'Post này chưa được Gemini classify thành lead. Có thể không match rule của shop hoặc post cũ hơn lead_max_age_days.' +
+      'This post has not been classified as a lead by Gemini. It may not match your shop rules or it is older than lead_max_age_days.' +
       '</div>';
   }
 
   const commentsHtml = comments.length === 0
-    ? '<span class="muted" style="font-size:12px;">chưa scrape comments</span>'
+    ? '<span class="muted" style="font-size:12px;">comments not scraped yet</span>'
     : comments.map(c => {
         const cIsAnon = c.author_typename === 'GroupAnonAuthorProfile' || c.author_typename === 'GroupAnonymousAuthor' || (c.author_id && !c.author_profile && !c.author_name);
         const cName   = c.author_name || (c.author_id ? 'User ' + c.author_id : '?');
@@ -2927,11 +2941,11 @@ async function viewItem(postId, leadIdOpt){
           : '<strong title="' + esc(cName) + '">' + cIcon + esc(cTrunc) + '</strong>';
         const cReact = c.reaction_count ? ' · ❤ ' + fmtN(c.reaction_count) : '';
         return '<div style="padding:8px 0; border-top:1px solid var(--border); font-size:12px;">' +
-                  cAuthor + ' <span class="muted">· ' + esc(fmtAgo(c.created_time)) + ' trước' + cReact + '</span>' +
+                  cAuthor + ' <span class="muted">· ' + esc(fmtAgo(c.created_time)) + ' ago' + cReact + '</span>' +
                   '<div style="white-space:pre-wrap; margin-top:2px;">' + esc(c.message || '') + '</div>' +
                '</div>';
       }).join('');
-  html += '<div style="margin-top:14px;"><div style="font-size:13px; font-weight:600; margin-bottom:6px;">💬 Comments (' + comments.length + ' đã scrape / ' + fmtN(commN) + ' trên FB)</div>' +
+  html += '<div style="margin-top:14px;"><div style="font-size:13px; font-weight:600; margin-bottom:6px;">💬 Comments (' + comments.length + ' scraped / ' + fmtN(commN) + ' on FB)</div>' +
     '<div style="max-height:300px; overflow-y:auto; background:var(--bg-card); border-radius:6px; padding:10px 12px;">' + commentsHtml + '</div></div>';
 
   $('detailBody').innerHTML = html;
@@ -2943,14 +2957,14 @@ async function saveItemStage(leadId, postId){
   const note  = $('leadNoteEdit').value;
   const r = await fetch('/api/leads/' + leadId, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify({ stage, note }) });
   const j = await r.json();
-  if (j.ok) { toast('Đã lưu', 'success'); viewItem(postId); loadStream(); }
-  else      toast('Lưu fail', 'error');
+  if (j.ok) { toast('Saved', 'success'); viewItem(postId); loadStream(); }
+  else      toast('Save failed', 'error');
 }
 async function addItemNote(leadId, postId){
   const note = $('leadNoteEdit').value.trim();
-  if (!note) { toast('Note rỗng', 'error'); return; }
+  if (!note) { toast('Note is empty', 'error'); return; }
   const r = await api('/api/leads/' + leadId + '/note', { note });
-  if (r?.ok) { toast('Đã thêm note vào history', 'success'); $('leadNoteEdit').value=''; viewItem(postId); }
+  if (r?.ok) { toast('Note added to history', 'success'); $('leadNoteEdit').value=''; viewItem(postId); }
 }
 
 window.viewItem = viewItem;
@@ -2979,22 +2993,22 @@ if ($('streamStatus')) {
 
 // ── ETL
 function buildAgentBannerHtml(j){
-  if (!j || !j.installed) return '⚠️ Chưa cài agent trên VPS.';
+  if (!j || !j.installed) return '⚠️ Agent not installed on the VPS.';
   if (j.run_in_flight) {
     const startedAgo = j.run_started_at
       ? Math.round((Date.now() - new Date(j.run_started_at).getTime()) / 1000) : 0;
     const mins = Math.floor(startedAgo / 60);
-    const ago  = mins > 0 ? mins + 'p ' + (startedAgo % 60) + 's' : startedAgo + 's';
+    const ago  = mins > 0 ? mins + 'm ' + (startedAgo % 60) + 's' : startedAgo + 's';
     if (j.run_mode === 'discover') {
-      return '🔍 <strong>Đang quét lại danh sách groups</strong> — bắt đầu ' + ago + ' trước (~30-60s).';
+      return '🔍 <strong>Re-scanning the groups list</strong> — started ' + ago + ' ago (~30-60s).';
     }
     let progress = '';
     if (j.run_groups_total && j.run_groups_total > 0) {
       const pct = Math.round((j.run_groups_done / j.run_groups_total) * 100);
-      const curr = j.run_current_group ? ' · đang xử lý <code>' + esc(j.run_current_group) + '</code>' : '';
+      const curr = j.run_current_group ? ' · processing <code>' + esc(j.run_current_group) + '</code>' : '';
       progress = ' · <strong>' + j.run_groups_done + '/' + j.run_groups_total + '</strong> groups (' + pct + '%)' + curr;
     }
-    return '🔄 <strong>Đang crawl (' + (j.run_mode || '?') + ')</strong> — bắt đầu ' + ago + ' trước' + progress + '.';
+    return '🔄 <strong>Crawling (' + (j.run_mode || '?') + ')</strong> — started ' + ago + ' ago' + progress + '.';
   }
   // Cron incr = "*/30 * * * *" → next tick is the next :00 or :30 mark.
   const now = new Date();
@@ -3002,14 +3016,14 @@ function buildAgentBannerHtml(j){
   next.setSeconds(0, 0);
   next.setMinutes(now.getMinutes() < 30 ? 30 : 60);
   const diffMin = Math.max(1, Math.round((next.getTime() - now.getTime()) / 60000));
-  return '✅ Agent idle. Crawl tự động tiếp theo: <strong>' + next.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'}) + '</strong> (trong ' + diffMin + ' phút).';
+  return '✅ Agent idle. Next automatic crawl: <strong>' + next.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}) + '</strong> (in ' + diffMin + ' min).';
 }
 
-// ── Setup tab (gộp Connection + Config + Activity, mỗi cái là sub-section) ──
-// HTML của 3 view gốc (FB Login, Settings, ETL Runs) đã đổi từ data-view= sang
-// id="srcLogin/srcSettings/srcEtl". loadSetup() di chuyển nodes (DOM appendChild)
-// giữa source containers và #setupBody. Move-nodes (vs innerHTML clone) giữ
-// nguyên event listeners + form values đã typed.
+// ── Setup tab (merges Connection + Config + Activity, each a sub-section) ──
+// The 3 original views (FB Login, Settings, ETL Runs) switched from data-view= to
+// id="srcLogin/srcSettings/srcEtl". loadSetup() moves the nodes (DOM appendChild)
+// between the source containers and #setupBody. Moving nodes (vs innerHTML clone)
+// preserves event listeners + already-typed form values.
 const SETUP_SRC_MAP = { connection: 'srcLogin', config: 'srcSettings', activity: 'srcEtl' };
 
 function setSetupSection(name){
@@ -3062,7 +3076,7 @@ async function loadCompose(){
         .filter(r => r.enabled !== false)
         .map(r => '<option value="' + esc(r.group_id) + '">' + esc(r.name || r.group_id) + '</option>')
         .join('');
-      sel.innerHTML = '<option value="">— chọn group —</option>' + opts;
+      sel.innerHTML = '<option value="">— select a group —</option>' + opts;
     }
   } catch (e) {}
   // 2) Wire submit handler (idempotent)
@@ -3076,9 +3090,9 @@ async function loadCompose(){
       const sch = $('composeSchedule').value;
       const msg = $('composeMsg');
       msg.className = 'muted text-xs self-center';
-      if (!gid) { msg.textContent = '✗ Chọn group đã'; return; }
-      if (content.length < 5) { msg.textContent = '✗ Nội dung quá ngắn'; return; }
-      btn.disabled = true; msg.textContent = '⏳ Đang gửi…';
+      if (!gid) { msg.textContent = '✗ Select a group first'; return; }
+      if (content.length < 5) { msg.textContent = '✗ Content too short'; return; }
+      btn.disabled = true; msg.textContent = '⏳ Sending…';
       try {
         const r = await fetch('/api/posts/compose', {
           method: 'POST', credentials: 'same-origin',
@@ -3086,8 +3100,8 @@ async function loadCompose(){
           body: JSON.stringify({ group_id: gid, content, image_urls: imgs, schedule_at: sch || null }),
         });
         const j = await r.json();
-        if (!r.ok) throw new Error(j?.error || 'lỗi');
-        msg.textContent = '✓ Đã queue (id ' + j.id + ')';
+        if (!r.ok) throw new Error(j?.error || 'error');
+        msg.textContent = '✓ Queued (id ' + j.id + ')';
         $('composeContent').value = '';
         $('composeImages').value = '';
         loadComposeQueue();
@@ -3108,7 +3122,7 @@ async function loadComposeQueue(){
   try {
     const j = await getJson('/api/posts/queue?limit=50');
     const rows = j?.rows || [];
-    if (!rows.length) { list.innerHTML = '<span class="muted text-xs">Chưa có bài nào.</span>'; return; }
+    if (!rows.length) { list.innerHTML = '<span class="muted text-xs">No posts yet.</span>'; return; }
     const pillClass = (s) => ({
       pending: 'bg-amber-100 text-amber-900',
       dispatched: 'bg-blue-100 text-blue-900',
@@ -3119,7 +3133,7 @@ async function loadComposeQueue(){
       cancelled: 'bg-gray-100 text-gray-700',
     })[s] || 'bg-gray-100 text-gray-700';
     list.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-muted-foreground border-b border-border">'
-      + '<th class="py-2 pr-3">ID</th><th class="py-2 pr-3">Group</th><th class="py-2 pr-3">Nội dung</th>'
+      + '<th class="py-2 pr-3">ID</th><th class="py-2 pr-3">Group</th><th class="py-2 pr-3">Content</th>'
       + '<th class="py-2 pr-3">Schedule</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Posted</th><th class="py-2"></th></tr></thead><tbody>'
       + rows.map(r => {
         const cancellable = r.status === 'pending';
@@ -3139,14 +3153,14 @@ async function loadComposeQueue(){
       }).join('') + '</tbody></table></div>';
     list.querySelectorAll('[data-cancel]').forEach(b => {
       b.onclick = async () => {
-        if (!confirm('Cancel bài này?')) return;
+        if (!confirm('Cancel this post?')) return;
         const id = b.dataset.cancel;
         const r = await fetch('/api/posts/queue/' + id, { method: 'DELETE', credentials: 'same-origin' });
         if (r.ok) loadComposeQueue();
       };
     });
   } catch (e) {
-    list.innerHTML = '<span class="text-xs text-red-600">Lỗi load: ' + esc(String(e?.message ?? e)) + '</span>';
+    list.innerHTML = '<span class="text-xs text-red-600">Load error: ' + esc(String(e?.message ?? e)) + '</span>';
   }
 }
 
@@ -3168,23 +3182,23 @@ async function renderRepliesQueue(){
   try {
     const j = await getJson('/api/replies/queue?limit=50');
     const rows = j?.rows || [];
-    if (!rows.length) { list.innerHTML = '<span class="muted text-xs">Chưa có reply nào cần duyệt.</span>'; return; }
+    if (!rows.length) { list.innerHTML = '<span class="muted text-xs">No replies to review.</span>'; return; }
     list.innerHTML = rows.map(r => {
-      const fbLink = r.post_permalink ? '<a href="' + esc(r.post_permalink) + '" target="_blank" class="underline text-xs ml-2">Xem post ↗</a>' : '';
+      const fbLink = r.post_permalink ? '<a href="' + esc(r.post_permalink) + '" target="_blank" class="underline text-xs ml-2">View post ↗</a>' : '';
       return '<div class="ui-card p-4 mb-3" data-reply-id="' + r.id + '">'
         + '<div class="flex items-center justify-between mb-2">'
         + '<div class="text-xs muted">#' + r.id + ' • ' + esc(r.group_name || '') + ' • <span class="text-amber-700">' + esc(r.intent || 'lead') + '</span>' + fbLink + '</div>'
         + '<div class="text-[11px] muted">' + esc(fmtTime(r.created_at)) + '</div>'
         + '</div>'
         + '<div class="bg-gray-50 dark:bg-gray-800 p-3 rounded text-xs mb-3 max-h-32 overflow-y-auto">'
-        + '<div class="font-medium muted mb-1">Post của khách:</div>'
+        + '<div class="font-medium muted mb-1">Customer\\'s post:</div>'
         + esc(String(r.post_message || '').slice(0, 600))
         + '</div>'
-        + '<label class="block text-xs font-medium mb-1">💬 Suggested reply (chỉnh sửa nếu cần):</label>'
+        + '<label class="block text-xs font-medium mb-1">💬 Suggested reply (edit if needed):</label>'
         + '<textarea data-final-text rows="3" class="form-input w-full text-sm" style="font-family:inherit;">' + esc(r.suggested_text) + '</textarea>'
         + '<div class="flex gap-2 mt-3">'
-        + '<button data-approve="' + r.id + '" class="btn btn-primary text-sm">✓ Duyệt + gửi</button>'
-        + '<button data-skip="' + r.id + '" class="btn btn-ghost text-sm">✗ Bỏ qua</button>'
+        + '<button data-approve="' + r.id + '" class="btn btn-primary text-sm">✓ Approve + send</button>'
+        + '<button data-skip="' + r.id + '" class="btn btn-ghost text-sm">✗ Skip</button>'
         + '<span data-msg class="muted text-xs self-center"></span>'
         + '</div></div>';
     }).join('');
@@ -3194,29 +3208,29 @@ async function renderRepliesQueue(){
         const id   = b.dataset.approve;
         const ft   = card.querySelector('[data-final-text]').value.trim();
         const msg  = card.querySelector('[data-msg]');
-        if (ft.length < 3) { msg.textContent = '✗ Reply quá ngắn'; return; }
-        b.disabled = true; msg.textContent = '⏳ Đang queue…';
+        if (ft.length < 3) { msg.textContent = '✗ Reply too short'; return; }
+        b.disabled = true; msg.textContent = '⏳ Queuing…';
         try {
           const r = await fetch('/api/replies/queue/' + id + '/approve', {
             method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ final_text: ft }),
           });
-          if (!r.ok) throw new Error('lỗi server');
-          msg.textContent = '✓ Đã queue';
+          if (!r.ok) throw new Error('server error');
+          msg.textContent = '✓ Queued';
           setTimeout(renderRepliesQueue, 800);
         } catch (e) { msg.textContent = '✗ ' + e.message; b.disabled = false; }
       };
     });
     list.querySelectorAll('[data-skip]').forEach(b => {
       b.onclick = async () => {
-        if (!confirm('Bỏ qua reply này?')) return;
+        if (!confirm('Skip this reply?')) return;
         const r = await fetch('/api/replies/queue/' + b.dataset.skip, { method: 'DELETE', credentials: 'same-origin' });
         if (r.ok) renderRepliesQueue();
       };
     });
   } catch (e) {
-    list.innerHTML = '<span class="text-xs text-red-600">Lỗi load: ' + esc(String(e?.message ?? e)) + '</span>';
+    list.innerHTML = '<span class="text-xs text-red-600">Load error: ' + esc(String(e?.message ?? e)) + '</span>';
   }
 }
 
@@ -3250,13 +3264,13 @@ async function loadEtl(){
 // ── Lead rule templates — preset starting points per industry.
 // NOTE: outer renderApp is a TS template literal so backticks are escaped to \\n.
 const LEAD_RULE_TEMPLATES = {
-  pod: 'Tôi bán dịch vụ in áo POD (print on demand) / phonecase / mug. Lead bao gồm:\\n- Khách hỏi giá in áo, hỏi xưởng in áo / phonecase / mug\\n- Khách tìm nhà cung cấp POD cho dropshipping (Etsy, Amazon)\\n- Khách hỏi về chất liệu, công nghệ in (DTG/DTF/sublimation)\\n- Khách hỏi MOQ, giá sỉ, sample\\nBỏ qua:\\n- Bài tuyển dụng designer, seller, marketer\\n- Bài seeding kêu like share\\n- Bài khoe sản phẩm đã in (không có ý mua)',
-  mmo: 'Tôi cung cấp tools/services cho MMO / dropshipping. Lead bao gồm:\\n- Khách hỏi tìm tool spy ads, tool research keyword\\n- Khách hỏi dịch vụ fulfill, logistics, payment\\n- Khách hỏi VPS / proxy / hosting cho MMO\\n- Khách tìm mentor, khóa học MMO/dropship\\nBỏ qua:\\n- Bài share kinh nghiệm không có nhu cầu mua\\n- Bài tuyển dụng / hợp tác PR\\n- Bài quảng cáo tools cạnh tranh',
-  bds: 'Tôi là môi giới bất động sản. Lead bao gồm:\\n- Khách muốn mua / thuê căn hộ, nhà phố, đất nền cụ thể\\n- Khách có ngân sách, khu vực, loại hình rõ ràng\\n- Khách hỏi định giá BĐS, thẩm định\\n- Khách cần vay ngân hàng để mua BĐS\\nBỏ qua:\\n- Bài đăng bán BĐS (đối thủ)\\n- Bài tuyển sale BĐS\\n- Bài chia sẻ kiến thức không có nhu cầu giao dịch',
-  tuyendung: 'Tôi làm headhunt / tuyển dụng. Lead bao gồm:\\n- Bài đăng tìm công việc / ứng viên đang tìm việc\\n- Bài hỏi về mức lương ngành / vị trí cụ thể\\n- Bài chia sẻ CV tìm việc\\n- Bài hỏi xin remote / part-time / hợp đồng\\nBỏ qua:\\n- Bài nhà tuyển dụng đăng tin tuyển (đối thủ)\\n- Bài đào tạo kỹ năng (trừ khi có ý tìm việc)\\n- Bài chia sẻ chung không có ý định ứng tuyển',
-  dichvu: 'Tôi cung cấp dịch vụ in ấn / sản xuất (offset, decal, name card, brochure, vinyl, banner). Lead bao gồm:\\n- Khách hỏi báo giá in cụ thể (số lượng, kích thước, chất liệu)\\n- Khách tìm xưởng in cho order định kỳ\\n- Khách hỏi mẫu, thời gian giao, ship COD\\n- Khách hỏi thiết kế + in trọn gói\\nBỏ qua:\\n- Bài giới thiệu xưởng in khác (đối thủ)\\n- Bài tuyển nhân viên thiết kế\\n- Bài seeding sản phẩm in',
-  spa: 'Tôi sở hữu spa / dịch vụ làm đẹp. Lead bao gồm:\\n- Khách hỏi giá liệu trình da, tóc, mi, móng\\n- Khách tìm spa gần khu vực cụ thể\\n- Khách hỏi review, kết quả của dịch vụ\\n- Khách hỏi liệu trình điều trị (mụn, nám, sẹo)\\nBỏ qua:\\n- Bài tuyển KTV, học viên\\n- Bài chia sẻ kiến thức làm đẹp không có ý đặt lịch\\n- Bài quảng cáo của spa khác',
-  fnb: 'Tôi sở hữu nhà hàng / quán ăn / F&B. Lead bao gồm:\\n- Khách hỏi đặt bàn, đặt tiệc số đông\\n- Khách hỏi menu, giá, ship đồ ăn\\n- Khách hỏi cho thuê mặt bằng nấu / sự kiện\\n- Khách hỏi nguồn nguyên liệu, supplier (nếu bán B2B)\\nBỏ qua:\\n- Bài giới thiệu quán khác\\n- Bài tuyển nhân viên bếp, phục vụ\\n- Bài chia sẻ công thức nấu ăn',
+  pod: 'I sell POD (print on demand) apparel / phone cases / mugs. Leads include:\\n- Customers asking for apparel printing prices, or for an apparel / phone case / mug print shop\\n- Customers looking for a POD supplier for dropshipping (Etsy, Amazon)\\n- Customers asking about materials, print technology (DTG/DTF/sublimation)\\n- Customers asking about MOQ, wholesale price, samples\\nIgnore:\\n- Posts recruiting designers, sellers, marketers\\n- Seeding posts asking for likes and shares\\n- Posts showing off finished prints (no intent to buy)',
+  mmo: 'I provide tools/services for MMO / dropshipping. Leads include:\\n- Customers looking for ad spy tools or keyword research tools\\n- Customers asking about fulfillment, logistics, payment services\\n- Customers asking about VPS / proxy / hosting for MMO\\n- Customers looking for a mentor or MMO/dropship course\\nIgnore:\\n- Posts sharing experience with no intent to buy\\n- Recruiting / PR partnership posts\\n- Ads for competing tools',
+  bds: 'I am a real estate broker. Leads include:\\n- Customers wanting to buy / rent a specific apartment, townhouse, or land plot\\n- Customers with a clear budget, area, and property type\\n- Customers asking about property valuation or appraisal\\n- Customers needing a bank loan to buy property\\nIgnore:\\n- Posts listing property for sale (competitors)\\n- Posts recruiting real estate sales\\n- Knowledge-sharing posts with no transaction intent',
+  tuyendung: 'I work in headhunting / recruiting. Leads include:\\n- Posts looking for a job / candidates actively job-hunting\\n- Posts asking about industry or specific-role salaries\\n- Posts sharing a CV to find a job\\n- Posts asking about remote / part-time / contract work\\nIgnore:\\n- Posts where recruiters advertise openings (competitors)\\n- Skills-training posts (unless there is job-seeking intent)\\n- General sharing posts with no intent to apply',
+  dichvu: 'I provide printing / manufacturing services (offset, decal, business cards, brochures, vinyl, banners). Leads include:\\n- Customers asking for a specific print quote (quantity, size, material)\\n- Customers looking for a print shop for recurring orders\\n- Customers asking about samples, turnaround time, COD shipping\\n- Customers asking for design + print as a full package\\nIgnore:\\n- Posts promoting other print shops (competitors)\\n- Posts recruiting design staff\\n- Seeding posts for printed products',
+  spa: 'I own a spa / beauty service. Leads include:\\n- Customers asking prices for skin, hair, lash, or nail treatments\\n- Customers looking for a spa near a specific area\\n- Customers asking about reviews or service results\\n- Customers asking about treatment courses (acne, melasma, scars)\\nIgnore:\\n- Posts recruiting technicians or trainees\\n- Beauty knowledge-sharing posts with no intent to book\\n- Ads from other spas',
+  fnb: 'I own a restaurant / eatery / F&B business. Leads include:\\n- Customers asking to book a table or a large party\\n- Customers asking about the menu, prices, food delivery\\n- Customers asking about renting a kitchen space / event venue\\n- Customers asking about ingredient sources or suppliers (if you sell B2B)\\nIgnore:\\n- Posts promoting other eateries\\n- Posts recruiting kitchen or service staff\\n- Recipe-sharing posts',
 };
 $('leadRuleTemplate') && ($('leadRuleTemplate').onchange = () => {
   const key = $('leadRuleTemplate').value;
@@ -3264,13 +3278,13 @@ $('leadRuleTemplate') && ($('leadRuleTemplate').onchange = () => {
   const ta = $('setLeadRules');
   // Don't overwrite if user already typed something — only fill if empty/short.
   if (ta.value.trim().length > 30) {
-    if (!confirm('Textarea đang có nội dung. Ghi đè bằng template "' + key + '"?')) {
+    if (!confirm('The textarea already has content. Overwrite it with the "' + key + '" template?')) {
       $('leadRuleTemplate').value = ''; // reset dropdown
       return;
     }
   }
   ta.value = LEAD_RULE_TEMPLATES[key];
-  toast('Đã load template "' + key + '" — chỉnh sửa cho phù hợp shop bạn rồi Save', 'success');
+  toast('Loaded the "' + key + '" template — edit it to fit your shop, then Save', 'success');
 });
 
 // ── Settings (Telegram + classifier)
@@ -3286,8 +3300,8 @@ async function loadSettings() {
   // Pre-select saved topic IDs (options populated by Detect button).
   window._savedTopicHr      = cfg.telegram_topic_hr ?? '';
   window._savedTopicFulfill = cfg.telegram_topic_fulfill ?? '';
-  if ($('setTgTopicHr')      && cfg.telegram_topic_hr)      ensureTopicOption('setTgTopicHr',      cfg.telegram_topic_hr,      'Lead HR (saved)');
-  if ($('setTgTopicFulfill') && cfg.telegram_topic_fulfill) ensureTopicOption('setTgTopicFulfill', cfg.telegram_topic_fulfill, 'Lead fulfill (saved)');
+  if ($('setTgTopicHr')      && cfg.telegram_topic_hr)      ensureTopicOption('setTgTopicHr',      cfg.telegram_topic_hr,      'HR lead (saved)');
+  if ($('setTgTopicFulfill') && cfg.telegram_topic_fulfill) ensureTopicOption('setTgTopicFulfill', cfg.telegram_topic_fulfill, 'Fulfillment lead (saved)');
   $('setClsEnabled').checked = cfg.classifier_enabled !== false;
   if ($('setGeminiKey')) $('setGeminiKey').value = cfg.gemini_api_key || '';
   $('setLeadRules').value = cfg.lead_rules || '';
@@ -3315,11 +3329,11 @@ async function loadBlocklist(){
     const j = await getJson('/api/blocklist');
     const rows = j?.rows || [];
     if (!rows.length) {
-      el.innerHTML = '<p class="muted text-xs">Chưa block công ty / tác giả nào.</p>';
+      el.innerHTML = '<p class="muted text-xs">No companies / authors blocked yet.</p>';
       return;
     }
     el.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-muted-foreground border-b border-border">'
-      + '<th class="py-2 pr-3">Scope</th><th class="py-2 pr-3">Tên</th><th class="py-2 pr-3">Khi block</th><th class="py-2 pr-3">Bởi</th><th class="py-2"></th></tr></thead><tbody>'
+      + '<th class="py-2 pr-3">Scope</th><th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Blocked at</th><th class="py-2 pr-3">By</th><th class="py-2"></th></tr></thead><tbody>'
       + rows.map(r => '<tr class="border-b border-border/50">'
         + '<td class="py-1.5 pr-3"><span class="text-[10px] px-1.5 py-0.5 rounded ' + (r.scope==='org' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900') + '">' + esc(r.scope) + '</span></td>'
         + '<td class="py-1.5 pr-3"><div class="font-medium">' + esc(r.display_name || r.pattern) + '</div>'
@@ -3330,30 +3344,30 @@ async function loadBlocklist(){
         + '</tr>').join('') + '</tbody></table></div>';
     el.querySelectorAll('[data-unblock]').forEach(b => {
       b.onclick = async () => {
-        if (!confirm('Remove block? Lead mới của công ty này sẽ lại pop alert.')) return;
+        if (!confirm('Remove block? New leads from this company will pop alerts again.')) return;
         const r = await fetch('/api/blocklist/' + b.dataset.unblock, { method:'DELETE', credentials:'same-origin' });
         if (r.ok) loadBlocklist();
       };
     });
   } catch (e) {
-    el.innerHTML = '<span class="text-xs text-red-600">Lỗi load: ' + esc(String(e?.message ?? e)) + '</span>';
+    el.innerHTML = '<span class="text-xs text-red-600">Load error: ' + esc(String(e?.message ?? e)) + '</span>';
   }
 }
 $('btnReloadBlocklist') && ($('btnReloadBlocklist').onclick = loadBlocklist);
 $('btnAddBlock') && ($('btnAddBlock').onclick = async () => {
   const scope = $('blkScope').value;
   const pattern = $('blkPattern').value.trim();
-  if (!pattern) { toast('Cần điền tên/ID','warn'); return; }
+  if (!pattern) { toast('Enter a name/ID','warn'); return; }
   const r = await fetch('/api/blocklist', { method:'POST', credentials:'same-origin', headers:{'content-type':'application/json'},
     body: JSON.stringify({ scope, pattern, display_name: pattern }) });
   const j = await r.json();
-  if (j.ok) { $('blkPattern').value = ''; toast('Đã thêm','success'); loadBlocklist(); }
-  else      { toast('Lỗi: ' + (j.error||'?'),'error'); }
+  if (j.ok) { $('blkPattern').value = ''; toast('Added','success'); loadBlocklist(); }
+  else      { toast('Error: ' + (j.error||'?'),'error'); }
 });
 
-// ─── Gemini usage / cost panel (Setup → Cấu hình) ────────────────────────
-const fmtInt = n => Number(n||0).toLocaleString('vi-VN');
-const fmtVnd = n => Number(n||0).toLocaleString('vi-VN') + ' ₫';
+// ─── Gemini usage / cost panel (Setup → Config) ────────────────────────
+const fmtInt = n => Number(n||0).toLocaleString('en-US');
+const fmtVnd = n => Number(n||0).toLocaleString('en-US') + ' ₫';
 const fmtUsd = n => '$' + (Number(n||0)).toFixed(4);
 async function loadGeminiUsage(){
   const sel = $('geminiUsageDays');
@@ -3368,18 +3382,18 @@ async function loadGeminiUsage(){
     const r = await fetch('/api/dashboard/gemini-usage?days=' + days, { credentials:'same-origin' });
     j = await r.json();
   } catch (e) {
-    body.innerHTML = '<tr><td colspan="7" class="py-3 text-red-500">Lỗi: ' + (e.message||e) + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="py-3 text-red-500">Error: ' + (e.message||e) + '</td></tr>';
     return;
   }
   const t = j.totals || {};
   totals.innerHTML = [
-    ['Tổng calls',   fmtInt(t.calls),         t.errors ? (fmtInt(t.errors)+' lỗi') : 'ok'],
+    ['Total calls',  fmtInt(t.calls),         t.errors ? (fmtInt(t.errors)+' errors') : 'ok'],
     ['Input tokens', fmtInt(t.prompt_tokens), j.model || ''],
     ['Output tokens',fmtInt(t.output_tokens), ''],
-    ['Chi phí',      fmtVnd(t.cost_vnd),      fmtUsd(t.cost_usd)],
+    ['Cost',         fmtVnd(t.cost_vnd),      fmtUsd(t.cost_usd)],
   ].map(([k,v,sub]) => '<div class="bg-card border border-border rounded p-2"><div class="text-[10px] text-muted-foreground uppercase">'+k+'</div><div class="text-base font-semibold">'+v+'</div><div class="text-[10px] text-muted-foreground">'+sub+'</div></div>').join('');
   if (!j.daily || !j.daily.length) {
-    body.innerHTML = '<tr><td colspan="7" class="py-3 text-muted-foreground">Chưa có call Gemini nào trong '+days+' ngày qua.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="py-3 text-muted-foreground">No Gemini calls in the last '+days+' days.</td></tr>';
   } else {
     body.innerHTML = j.daily.map(r =>
       '<tr class="border-b border-border/50 hover:bg-accent/30">'
@@ -3409,20 +3423,20 @@ $('btnReloadGeminiUsage') && ($('btnReloadGeminiUsage').onclick = loadGeminiUsag
 $('geminiUsageDays')      && ($('geminiUsageDays').onchange   = loadGeminiUsage);
 
 $('btnReclassifyAll') && ($('btnReclassifyAll').onclick = async () => {
-  if (!confirm('⚠ Sẽ XOÁ toàn bộ lead hiện tại + re-classify mọi post với rule mới.\\n\\nTốn Gemini quota tỉ lệ với số post. Kanban + Reports sẽ trống vài phút.\\n\\nXác nhận?')) return;
+  if (!confirm('⚠ This will DELETE all current leads and re-classify every post with the new rules.\\n\\nUses Gemini quota proportional to the number of posts. The Kanban + Reports will be empty for a few minutes.\\n\\nConfirm?')) return;
   $('btnReclassifyAll').disabled = true;
-  $('btnReclassifyAll').textContent = '⏳ Đang xử lý...';
+  $('btnReclassifyAll').textContent = '⏳ Processing...';
   try {
     const r = await fetch('/api/leads/reclassify-all', { method:'POST', credentials:'same-origin' });
     const j = await r.json();
     if (j.ok) {
       $('settingsMsg2').textContent = '✓ ' + j.message;
-      toast('Re-classify started — refresh Leads sau vài phút','success', 8000);
+      toast('Re-classify started — refresh Leads in a few minutes','success', 8000);
     } else {
-      $('settingsMsg2').textContent = '✗ ' + (j.message || j.error || 'Lỗi');
-      toast('Lỗi','error');
+      $('settingsMsg2').textContent = '✗ ' + (j.message || j.error || 'Error');
+      toast('Error','error');
     }
-  } catch (e) { toast('Lỗi mạng: ' + e.message,'error'); }
+  } catch (e) { toast('Network error: ' + e.message,'error'); }
   finally {
     $('btnReclassifyAll').disabled = false;
     $('btnReclassifyAll').textContent = '🔄 Re-classify all posts';
@@ -3447,8 +3461,8 @@ $('btnSettingsSave2') && ($('btnSettingsSave2').onclick = async () => {
   const r = await fetch('/api/settings', { method:'PATCH', credentials:'same-origin', headers:{'content-type':'application/json'}, body: JSON.stringify(body) });
   const j = await r.json();
   $('btnSettingsSave2').disabled = false;
-  if (j.ok) { $('settingsMsg2').textContent = '✓ Saved — post mới crawl về sẽ dùng rules này'; toast('Saved','success'); }
-  else      { $('settingsMsg2').textContent = '✗ Lỗi: ' + (j.message||j.error); toast('Lỗi','error'); }
+  if (j.ok) { $('settingsMsg2').textContent = '✓ Saved — newly crawled posts will use these rules'; toast('Saved','success'); }
+  else      { $('settingsMsg2').textContent = '✗ Error: ' + (j.message||j.error); toast('Error','error'); }
 });
 $('btnSettingsSave').onclick = async () => {
   $('btnSettingsSave').disabled = true;
@@ -3464,28 +3478,28 @@ $('btnSettingsSave').onclick = async () => {
   const r = await fetch('/api/settings', { method: 'PATCH', credentials: 'same-origin', headers: {'content-type':'application/json'}, body: JSON.stringify(body) });
   const j = await r.json();
   $('btnSettingsSave').disabled = false;
-  if (j.ok) { $('settingsMsg').textContent = '✓ Saved'; toast('Settings đã lưu','success'); }
-  else      { $('settingsMsg').textContent = '✗ Lỗi: ' + (j.message||j.error); toast('Lỗi','error'); }
+  if (j.ok) { $('settingsMsg').textContent = '✓ Saved'; toast('Settings saved','success'); }
+  else      { $('settingsMsg').textContent = '✗ Error: ' + (j.message||j.error); toast('Error','error'); }
 };
 $('btnSettingsTest').onclick = async () => {
   $('btnSettingsTest').disabled = true;
-  $('settingsMsg').textContent = '⏳ Đang gửi test message…';
+  $('settingsMsg').textContent = '⏳ Sending test message…';
   const r = await fetch('/api/settings/telegram/test', { method:'POST', credentials:'same-origin' });
   const j = await r.json();
   $('btnSettingsTest').disabled = false;
-  if (j.ok) { $('settingsMsg').textContent = '✅ Gửi thành công — check Telegram của bạn'; toast('Test OK','success'); }
-  else      { $('settingsMsg').textContent = '❌ ' + (j.error || 'Lỗi không xác định'); toast('Test fail','error'); }
+  if (j.ok) { $('settingsMsg').textContent = '✅ Sent successfully — check your Telegram'; toast('Test OK','success'); }
+  else      { $('settingsMsg').textContent = '❌ ' + (j.error || 'Unknown error'); toast('Test fail','error'); }
 };
 
 function renderTgChatBox(chatId, title){
   const box = $('setTgChatBox');
   if (!box) return;
   if (!chatId) {
-    box.innerHTML = 'Chưa detect — paste token rồi bấm <b>🔍 Detect chat</b>';
+    box.innerHTML = 'Not detected yet — paste the token and click <b>🔍 Detect chat</b>';
     box.style.color = 'var(--text-muted)';
     return;
   }
-  const label = title ? esc(title) : 'Chat đã lưu';
+  const label = title ? esc(title) : 'Saved chat';
   box.innerHTML = '✅ <b>' + label + '</b> · <code style="font-size:12px;">id ' + esc(String(chatId)) + '</code>';
   box.style.color = '#9eecbe';
 }
@@ -3497,11 +3511,11 @@ function renderTgChatPicker(chats){
     renderTgChatBox(c.id, c.title + ' (' + c.type + ')');
     // Persist immediately so reload doesn't lose it.
     fetch('/api/settings', { method:'PATCH', credentials:'same-origin', headers:{'content-type':'application/json'}, body: JSON.stringify({ telegram_chat_id: String(c.id), telegram_chat_title: c.title + ' (' + c.type + ')' }) });
-    toast('Đã detect: ' + c.title, 'success');
+    toast('Detected: ' + c.title, 'success');
     return;
   }
   box.style.color = 'var(--text)';
-  box.innerHTML = '<div style="margin-bottom:8px;">Tìm thấy ' + chats.length + ' chats — chọn 1:</div>' +
+  box.innerHTML = '<div style="margin-bottom:8px;">Found ' + chats.length + ' chats — pick one:</div>' +
     chats.map(c =>
       '<button type="button" class="js-tg-pick" data-id="' + esc(String(c.id)) + '" data-title="' + esc(c.title + ' (' + c.type + ')') + '" style="display:block; width:100%; text-align:left; padding:8px 12px; margin-bottom:4px; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:4px; color:var(--text); cursor:pointer;">' +
       '<b>' + esc(c.title) + '</b> <span style="color:var(--text-muted); font-size:12px;">· ' + esc(c.type) + ' · id ' + esc(String(c.id)) + '</span></button>'
@@ -3511,15 +3525,15 @@ function renderTgChatPicker(chats){
       $('setTgChat').value = btn.dataset.id;
       renderTgChatBox(btn.dataset.id, btn.dataset.title);
       fetch('/api/settings', { method:'PATCH', credentials:'same-origin', headers:{'content-type':'application/json'}, body: JSON.stringify({ telegram_chat_id: btn.dataset.id, telegram_chat_title: btn.dataset.title }) });
-      toast('Đã chọn: ' + btn.dataset.title, 'success');
+      toast('Selected: ' + btn.dataset.title, 'success');
     };
   });
 }
 $('btnTgDetect') && ($('btnTgDetect').onclick = async () => {
   const token = $('setTgToken').value.trim();
-  if (!token) { toast('Paste bot token trước', 'error'); return; }
+  if (!token) { toast('Paste the bot token first', 'error'); return; }
   $('btnTgDetect').disabled = true;
-  $('btnTgDetect').textContent = '⏳ Đang dò…';
+  $('btnTgDetect').textContent = '⏳ Detecting…';
   // Save the token first so test/save can use it even if user navigates away.
   await fetch('/api/settings', { method:'PATCH', credentials:'same-origin', headers:{'content-type':'application/json'}, body: JSON.stringify({ telegram_bot_token: token }) });
   try {
@@ -3530,16 +3544,16 @@ $('btnTgDetect') && ($('btnTgDetect').onclick = async () => {
     });
     const j = await r.json();
     if (!j.ok) {
-      $('setTgChatBox').innerHTML = '❌ ' + esc(j.error || 'Lỗi');
+      $('setTgChatBox').innerHTML = '❌ ' + esc(j.error || 'Error');
       $('setTgChatBox').style.color = '#ff8a8a';
       toast(j.error || 'Detect fail', 'error');
     } else if (!j.chats || j.chats.length === 0) {
-      $('setTgChatBox').innerHTML = '⚠️ ' + esc(j.message || 'Chưa có chat nào');
+      $('setTgChatBox').innerHTML = '⚠️ ' + esc(j.message || 'No chats yet');
       $('setTgChatBox').style.color = '#ffce72';
     } else {
       renderTgChatPicker(j.chats);
     }
-  } catch (e) { toast('Lỗi mạng: ' + e.message, 'error'); }
+  } catch (e) { toast('Network error: ' + e.message, 'error'); }
   finally {
     $('btnTgDetect').disabled = false;
     $('btnTgDetect').textContent = '🔍 Detect chat';
@@ -3563,8 +3577,8 @@ function populateTopicSelects(topics){
     // Keep the placeholder + any saved option, drop the rest, then re-add.
     const saved = sel.value;
     sel.innerHTML = (id === 'setTgTopicHr'
-      ? '<option value="">— Lead HR — General —</option>'
-      : '<option value="">— Lead fulfill — General —</option>');
+      ? '<option value="">— HR lead — General —</option>'
+      : '<option value="">— Fulfillment lead — General —</option>');
     for (const t of topics) {
       const o = document.createElement('option');
       o.value = String(t.thread_id);
@@ -3580,10 +3594,10 @@ $('btnTgDetectTopics') && ($('btnTgDetectTopics').onclick = async () => {
   try {
     const r = await fetch('/api/settings/telegram/detect-topics', { method: 'POST', credentials: 'same-origin', headers: {'content-type':'application/json'}, body: '{}' });
     const j = await r.json();
-    if (!j.ok)               { toast(j.error || 'Lỗi', 'error'); }
-    else if (!j.topics?.length) { toast(j.message || 'Chưa thấy topic nào', 'error', 6000); }
-    else                       { populateTopicSelects(j.topics); toast('Đã detect ' + j.topics.length + ' topics', 'success'); }
-  } catch (e) { toast('Lỗi mạng: ' + e.message, 'error'); }
+    if (!j.ok)               { toast(j.error || 'Error', 'error'); }
+    else if (!j.topics?.length) { toast(j.message || 'No topics found', 'error', 6000); }
+    else                       { populateTopicSelects(j.topics); toast('Detected ' + j.topics.length + ' topics', 'success'); }
+  } catch (e) { toast('Network error: ' + e.message, 'error'); }
   finally {
     $('btnTgDetectTopics').disabled = false;
     $('btnTgDetectTopics').textContent = '🔍 Detect topics';
@@ -3602,26 +3616,26 @@ $('btnFbAutoFetch') && ($('btnFbAutoFetch').onclick = async () => {
     });
     const j = await r.json();
     if (j.ok) {
-      toast('Đã queue. Đợi ~60-90s rồi reload Settings để thấy tên/avatar mới.', 'success', 8000);
+      toast('Queued. Wait ~60-90s, then reload Settings to see the new name/avatar.', 'success', 8000);
       // Auto-reload settings after 90s to pull in new values
       setTimeout(() => loadSettings(), 90_000);
     } else {
-      toast('Lỗi: ' + (j.message || j.error || '?'), 'error');
+      toast('Error: ' + (j.message || j.error || '?'), 'error');
     }
-  } catch (e) { toast('Lỗi mạng: ' + e.message, 'error'); }
+  } catch (e) { toast('Network error: ' + e.message, 'error'); }
   finally {
-    setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Auto-fetch từ VPS'; }, 5000);
+    setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Auto-fetch from VPS'; }, 5000);
   }
 });
 
 // ── Insights
 async function loadInsights(){
   const list = $('insightsList');
-  list.innerHTML = '<span class="muted">Đang tải…</span>';
+  list.innerHTML = '<span class="muted">Loading…</span>';
   const j = await getJson('/api/insights');
   const rows = j?.rows ?? [];
   if (rows.length === 0) {
-    list.innerHTML = '<div class="panel" style="padding:20px; text-align:center;"><p class="muted">Chưa có insights nào.</p><p class="muted" style="font-size:12px;">Bấm <strong>⚡ Generate now</strong> ở trên để chạy phân tích cho tuần hiện tại.</p></div>';
+    list.innerHTML = '<div class="panel" style="padding:20px; text-align:center;"><p class="muted">No insights yet.</p><p class="muted" style="font-size:12px;">Click <strong>⚡ Generate now</strong> above to run the analysis for the current week.</p></div>';
     return;
   }
   // Group by week_start
@@ -3631,15 +3645,15 @@ async function loadInsights(){
   }
   const weeks = Object.keys(byWeek).sort().reverse();
   const catMeta = {
-    hr:      { label: '💼 HR (Tuyển dụng)',  color: '#a78bfa' },
-    fulfill: { label: '📦 Fulfill (sup/xưởng)', color: '#22c55e' },
-    other:   { label: '📌 Khác',             color: '#6b7280' },
+    hr:      { label: '💼 HR (recruiting)',  color: '#a78bfa' },
+    fulfill: { label: '📦 Fulfillment (supplier/factory)', color: '#22c55e' },
+    other:   { label: '📌 Other',             color: '#6b7280' },
   };
   list.innerHTML = weeks.map(week => {
     const buckets = byWeek[week];
     const headerDate = fmtTime(week + 'T00:00:00').slice(0, 10);
     return '<div class="panel" style="margin-bottom:14px; padding:16px;">' +
-      '<h3 style="margin:0 0 12px; font-size:15px;">Tuần bắt đầu ' + esc(headerDate) + '</h3>' +
+      '<h3 style="margin:0 0 12px; font-size:15px;">Week of ' + esc(headerDate) + '</h3>' +
       '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:14px;">' +
         buckets.filter(b => b.category !== 'other').map(b => renderInsightCard(b, catMeta[b.category])).join('') +
       '</div>' +
@@ -3676,15 +3690,15 @@ function renderInsightCard(b, meta){
     // Stat cards (4 numbers)
     '<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px;">' +
       mkStat(stats.total_comments,    'comments') +
-      mkStat(stats.contact_rate_pct + '%', 'có contact') +
-      mkStat(stats.price_rate_pct + '%',   'có giá') +
-      mkStat(stats.unique_competitors,'đối thủ') +
+      mkStat(stats.contact_rate_pct + '%', 'with contact') +
+      mkStat(stats.price_rate_pct + '%',   'with price') +
+      mkStat(stats.unique_competitors,'competitors') +
     '</div>' +
 
     // Competitors table
     (competitors.length === 0 ? '' :
       '<div>' +
-        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">🎯 Top đối thủ (' + competitors.length + ')</div>' +
+        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">🎯 Top competitors (' + competitors.length + ')</div>' +
         '<div style="background:var(--bg-input); border-radius:5px; padding:8px;">' +
           competitors.slice(0, 5).map(c =>
             '<div style="padding:6px 0; border-bottom:1px solid var(--border); font-size:12px;">' +
@@ -3699,7 +3713,7 @@ function renderInsightCard(b, meta){
     // Prices
     (prices.length === 0 ? '' :
       '<div>' +
-        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">💰 Giá thị trường</div>' +
+        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">💰 Market prices</div>' +
         '<div style="display:flex; flex-direction:column; gap:4px;">' +
           prices.slice(0, 5).map(p =>
             '<div style="display:flex; justify-content:space-between; gap:8px; background:var(--bg-input); padding:6px 10px; border-radius:4px; font-size:12px;">' +
@@ -3713,7 +3727,7 @@ function renderInsightCard(b, meta){
     // Hot products as tags
     (products.length === 0 ? '' :
       '<div>' +
-        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">🔥 Sản phẩm hot</div>' +
+        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">🔥 Hot products</div>' +
         '<div style="display:flex; flex-wrap:wrap; gap:5px;">' +
           products.map(p =>
             '<span style="padding:3px 8px; background:#1f3f2a; color:#9eecbe; border-radius:99px; font-size:11px;">' + esc(p.name) + (p.n_signal ? ' · ' + p.n_signal : '') + '</span>'
@@ -3724,7 +3738,7 @@ function renderInsightCard(b, meta){
     // Actions (3 boxes)
     (actions.length === 0 ? '' :
       '<div>' +
-        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">⚡ Hành động đề xuất</div>' +
+        '<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase;">⚡ Suggested actions</div>' +
         '<div style="display:flex; flex-direction:column; gap:6px;">' +
           actions.slice(0, 3).map(a => {
             const pc = prColor[a.priority] || '#6b7280';
@@ -3752,11 +3766,11 @@ async function loadDashStatus(){
     if (!r.ok) return;
     const j = await r.json();
     const dot = $('dashStatusDot'), txt = $('dashStatusText'), nxt = $('dashNextCron');
-    if (!j.installed) { dot.className = 'w-2 h-2 rounded-full bg-destructive'; txt.textContent = 'Chưa cài agent trên VPS'; nxt.textContent = ''; return; }
+    if (!j.installed) { dot.className = 'w-2 h-2 rounded-full bg-destructive'; txt.textContent = 'Agent not installed on the VPS'; nxt.textContent = ''; return; }
     if (j.run_in_flight) {
       dot.className = 'w-2 h-2 rounded-full bg-warning animate-pulse';
       const prog = (j.run_groups_total && j.run_groups_total > 0) ? ' · ' + j.run_groups_done + '/' + j.run_groups_total + ' groups' : '';
-      txt.textContent = '🔄 Đang crawl (' + (j.run_mode || '?') + ')' + prog;
+      txt.textContent = '🔄 Crawling (' + (j.run_mode || '?') + ')' + prog;
     } else {
       dot.className = 'w-2 h-2 rounded-full bg-success';
       txt.textContent = '✅ Agent idle · v' + (j.agent_version || '?');
@@ -3766,7 +3780,7 @@ async function loadDashStatus(){
     next.setSeconds(0, 0);
     next.setMinutes(now.getMinutes() < 30 ? 30 : 60);
     const diff = Math.max(1, Math.round((next.getTime() - now.getTime()) / 60000));
-    nxt.textContent = 'Crawl tự động: ' + next.toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'}) + ' (trong ' + diff + ' phút)';
+    nxt.textContent = 'Auto crawl: ' + next.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}) + ' (in ' + diff + ' min)';
   } catch {}
 }
 
@@ -3774,11 +3788,11 @@ async function loadDashStatus(){
 async function loadDashInsights(){
   if (!$('dashInsightsList')) return;
   const wrap = $('dashInsightsList');
-  wrap.innerHTML = '<div class="text-xs text-muted-foreground col-span-2">Đang tải…</div>';
+  wrap.innerHTML = '<div class="text-xs text-muted-foreground col-span-2">Loading…</div>';
   const j = await getJson('/api/insights');
   const rows = (j?.rows ?? []).filter(r => r.category !== 'other');
   if (rows.length === 0) {
-    wrap.innerHTML = '<div class="col-span-2 text-center py-6"><p class="text-sm text-muted-foreground m-0">Chưa có insights nào.</p><p class="text-xs text-muted-foreground mt-1 m-0">Bấm <strong>⚡ Generate</strong> để chạy phân tích cho tuần hiện tại (~15s).</p></div>';
+    wrap.innerHTML = '<div class="col-span-2 text-center py-6"><p class="text-sm text-muted-foreground m-0">No insights yet.</p><p class="text-xs text-muted-foreground mt-1 m-0">Click <strong>⚡ Generate</strong> to run the analysis for the current week (~15s).</p></div>';
     $('dashInsightWeek').textContent = '';
     return;
   }
@@ -3786,11 +3800,11 @@ async function loadDashInsights(){
   const byWeek = {};
   for (const r of rows) (byWeek[r.week_start] = byWeek[r.week_start] || []).push(r);
   const latestWeek = Object.keys(byWeek).sort().reverse()[0];
-  $('dashInsightWeek').textContent = '· tuần bắt đầu ' + fmtTime(latestWeek + 'T00:00:00').slice(0, 10);
+  $('dashInsightWeek').textContent = '· week of ' + fmtTime(latestWeek + 'T00:00:00').slice(0, 10);
   const buckets = byWeek[latestWeek];
   const catMeta = {
-    hr:      { label: '💼 HR (Tuyển dụng)',      color: 'text-purple-500',  bg: 'bg-purple-500/10', border: 'border-l-purple-500' },
-    fulfill: { label: '📦 Fulfill (sup/xưởng)',  color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-l-emerald-500' },
+    hr:      { label: '💼 HR (recruiting)',      color: 'text-purple-500',  bg: 'bg-purple-500/10', border: 'border-l-purple-500' },
+    fulfill: { label: '📦 Fulfillment (supplier/factory)',  color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-l-emerald-500' },
   };
   wrap.innerHTML = buckets.map(b => {
     let g = null; try { g = JSON.parse(b.gemini_summary || '{}'); } catch {}
@@ -3799,12 +3813,12 @@ async function loadDashInsights(){
     return '<div class="ui-card border-l-4 ' + m.border + ' p-4">' +
       '<div class="flex items-center justify-between mb-2">' +
         '<strong class="text-sm font-semibold ' + m.color + '">' + m.label + '</strong>' +
-        '<span class="text-[11px] text-muted-foreground">' + (stats.total_comments ?? b.total_comments) + ' cmts · ' + (stats.unique_competitors || 0) + ' đối thủ</span>' +
+        '<span class="text-[11px] text-muted-foreground">' + (stats.total_comments ?? b.total_comments) + ' cmts · ' + (stats.unique_competitors || 0) + ' competitors</span>' +
       '</div>' +
       (g?.headline
         ? '<div class="text-[13px] leading-snug mb-3">💡 ' + esc(g.headline) + '</div>'
         : '<div class="text-xs text-muted-foreground mb-3">(no headline)</div>') +
-      '<button onclick="expandDashInsights()" class="text-xs text-primary hover:underline">Xem chi tiết →</button>' +
+      '<button onclick="expandDashInsights()" class="text-xs text-primary hover:underline">View details →</button>' +
     '</div>';
   }).join('');
   $('btnDashInsightExpand').classList.remove('hidden');
@@ -3813,8 +3827,8 @@ async function loadDashInsights(){
 window.expandDashInsights = function(){
   const full = $('dashInsightsFull');
   full.classList.toggle('hidden');
-  if (full.classList.contains('hidden')) { $('btnDashInsightExpand').textContent = '⤡ Mở rộng'; return; }
-  $('btnDashInsightExpand').textContent = '⤢ Thu gọn';
+  if (full.classList.contains('hidden')) { $('btnDashInsightExpand').textContent = '⤡ Expand'; return; }
+  $('btnDashInsightExpand').textContent = '⤢ Collapse';
   // Render full insight cards in expanded section
   getJson('/api/insights').then(j => {
     const rows = (j?.rows ?? []).filter(r => r.category !== 'other');
@@ -3822,12 +3836,12 @@ window.expandDashInsights = function(){
     for (const r of rows) (byWeek[r.week_start] = byWeek[r.week_start] || []).push(r);
     const weeks = Object.keys(byWeek).sort().reverse().slice(0, 4);
     const catMeta = {
-      hr:      { label: '💼 HR (Tuyển dụng)',     color: '#a78bfa' },
-      fulfill: { label: '📦 Fulfill (sup/xưởng)', color: '#22c55e' },
+      hr:      { label: '💼 HR (recruiting)',     color: '#a78bfa' },
+      fulfill: { label: '📦 Fulfillment (supplier/factory)', color: '#22c55e' },
     };
     full.innerHTML = weeks.map(week => {
       const headerDate = fmtTime(week + 'T00:00:00').slice(0, 10);
-      return '<div class="mb-4"><h4 class="text-sm font-semibold m-0 mb-2">Tuần ' + esc(headerDate) + '</h4>' +
+      return '<div class="mb-4"><h4 class="text-sm font-semibold m-0 mb-2">Week ' + esc(headerDate) + '</h4>' +
         '<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">' +
           byWeek[week].map(b => renderInsightCard(b, catMeta[b.category] || catMeta.fulfill)).join('') +
         '</div></div>';
@@ -3842,8 +3856,8 @@ $('btnDashInsightGen') && ($('btnDashInsightGen').onclick = async () => {
     const r = await fetch('/api/insights/generate', { method: 'POST', credentials: 'same-origin' });
     const j = await r.json();
     if (j.ok) { toast('Generated', 'success'); loadDashInsights(); }
-    else      toast('Lỗi: ' + (j.error || '?'), 'error');
-  } catch (e) { toast('Lỗi mạng: ' + e.message, 'error'); }
+    else      toast('Error: ' + (j.error || '?'), 'error');
+  } catch (e) { toast('Network error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = '⚡ Generate'; }
 });
 
@@ -3888,7 +3902,7 @@ async function loadReports() {
     // Heatmap (manual SVG grid)
     renderHeatmap('heatmapBox', heat.cells || []);
   } catch (e) {
-    toast('Lỗi load reports: ' + e.message, 'error');
+    toast('Error loading reports: ' + e.message, 'error');
   }
 }
 
@@ -3973,6 +3987,11 @@ fetch('/auth/me', { credentials: 'same-origin' })
       if (j.user.tenant_id === 'default' || j.user.tenant_id === 'tuantran') {
         $('navDiscover').style.display = '';
       }
+      // Self-serve token: show this tenant's license + ready-to-paste install command.
+      var lk = j.user.license_key || '';
+      var cmd = 'curl -fsSL ' + location.origin + '/install.sh | LICENSE_KEY=' + lk + ' bash';
+      document.querySelectorAll('.installCmd').forEach(function(el){ el.textContent = cmd; });
+      document.querySelectorAll('.licenseKeyFull').forEach(function(el){ el.textContent = lk; });
     }
   }).catch(()=>{});
 
@@ -3987,7 +4006,7 @@ const LEGACY_MAP = {
   login:    { view: 'setup' },                                    // → Connection
   settings: { view: 'setup', _section: 'config' },                // → Config
   etl:      { view: 'setup', _section: 'activity' },              // → Activity
-  comments: { view: 'stream' },                                    // gỡ tab Comments
+  comments: { view: 'stream' },                                    // removed Comments tab
 };
 let initial = _h.view;
 if (LEGACY_MAP[initial]) {
@@ -4013,7 +4032,7 @@ window.addEventListener('hashchange', () => {
   if (TITLES[view]) switchView(view);
 });
 // Kick off global agent polling immediately so even users who never click the
-// FB Login tab get button states synced + see the "Đang crawl" indicator.
+// FB Login tab get button states synced + see the "Crawling" indicator.
 if (typeof startAgentPolling === 'function') { window._globalPollStarted = true; startAgentPolling(); }
 setInterval(() => { if (parseHash().view === 'dashboard') { loadDashboard(); loadDashStatus(); } }, 15000);
 </script>
@@ -4074,7 +4093,9 @@ async function start(): Promise<void> {
   const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN ?? '';
   const INTERNAL_TENANT = process.env.DEFAULT_TENANT_ID ?? 'tuantran';
   // Public paths (no auth needed). `/` is special: serves landing for anon, dashboard for authed.
-  const PUBLIC_PATHS = new Set(['/', '/install.sh', '/favicon.ico']);
+  const PUBLIC_PATHS = new Set(['/', '/install.sh', '/favicon.ico', '/health']);
+  // Liveness probe for docker healthcheck / nginx / CI deploy wait. No auth, no DB.
+  app.get('/health', async () => ({ ok: true, ts: Date.now() }));
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
     if (path.startsWith('/auth/')) return;
@@ -4085,7 +4106,7 @@ async function start(): Promise<void> {
     // Agent traffic: Bearer license_key on /api/agent/* bypasses session auth.
     if (path.startsWith('/api/agent/')) {
       const ok = await tryAuthAgent(req);
-      if (!ok) return reply.status(401).send({ error: 'invalid_license', message: 'License key không hợp lệ' });
+      if (!ok) return reply.status(401).send({ error: 'invalid_license', message: 'Invalid license key' });
       return;
     }
 
@@ -4109,7 +4130,7 @@ async function start(): Promise<void> {
     }
     if (PUBLIC_PATHS.has(path)) return;
     if (path.startsWith('/api/')) {
-      return reply.status(401).send({ error: 'unauthorized', message: 'Cần đăng nhập' });
+      return reply.status(401).send({ error: 'unauthorized', message: 'Login required' });
     }
     return reply.redirect('/auth/login');
   });

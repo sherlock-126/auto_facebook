@@ -125,18 +125,18 @@ function extractPhotoUrl(raw: any, attachmentUrl: string | null): string | null 
 export async function sendTelegramTest(tenantId: string): Promise<{ ok: boolean; error?: string }> {
   const cfg = await getTenantConfig(tenantId);
   if (!cfg.telegram_bot_token || !cfg.telegram_chat_id) {
-    return { ok: false, error: 'Chưa cấu hình bot_token + chat_id' };
+    return { ok: false, error: 'bot_token + chat_id not configured' };
   }
   // Send 1 ping to each configured channel so user verifies routing works.
   const targets: { name: string; threadId: number | null }[] = [
     { name: 'General', threadId: null },
   ];
-  if (cfg.telegram_topic_hr)      targets.push({ name: 'Lead HR (recruitment)', threadId: cfg.telegram_topic_hr });
-  if (cfg.telegram_topic_fulfill) targets.push({ name: 'Lead fulfill (sup/xưởng)', threadId: cfg.telegram_topic_fulfill });
+  if (cfg.telegram_topic_hr)      targets.push({ name: 'HR leads (recruitment)', threadId: cfg.telegram_topic_hr });
+  if (cfg.telegram_topic_fulfill) targets.push({ name: 'Fulfill leads (supplier)', threadId: cfg.telegram_topic_fulfill });
 
   const errors: string[] = [];
   for (const t of targets) {
-    const text = `🟢 <b>Test → ${escapeHtml(t.name)}</b>\n\nKênh này sẽ nhận lead loại <i>${escapeHtml(t.name)}</i>. Nếu thấy message này đúng topic → routing OK.`;
+    const text = `🟢 <b>Test → ${escapeHtml(t.name)}</b>\n\nThis channel will receive <i>${escapeHtml(t.name)}</i>. If you see this message in the right topic, routing is OK.`;
     const r = await telegramSend(cfg.telegram_bot_token, cfg.telegram_chat_id, text, undefined, t.threadId);
     if (!r.ok) errors.push(`${t.name}: ${r.description}`);
   }
@@ -207,11 +207,11 @@ async function sendLeadAlert(tenantId: string, leadId: number): Promise<void> {
     : `${icon} ${escapeHtml(displayName)}`;
 
   const postedLine = lead.created_time
-    ? `🕒 Đăng lúc <b>${formatVnTime(lead.created_time)}</b> · ${humanizeAgo(lead.created_time)}`
+    ? `🕒 Posted at <b>${formatVnTime(lead.created_time)}</b> · ${humanizeAgo(lead.created_time)}`
     : '';
 
   const text = [
-    `🔥 <b>Lead mới — ${escapeHtml(intentLabel)}</b>  <i>(${confPct}%)</i>`,
+    `🔥 <b>New lead — ${escapeHtml(intentLabel)}</b>  <i>(${confPct}%)</i>`,
     '',
     authorLine,
     `📍 <b>${escapeHtml(groupName)}</b>`,
@@ -224,13 +224,13 @@ async function sendLeadAlert(tenantId: string, leadId: number): Promise<void> {
   const row1: TelegramInlineKeyboardButton[] = [];
   if (!isAnon) {
     const profileUrl = authorProfile || (lead.author_id ? `https://www.facebook.com/${lead.author_id}` : null);
-    if (profileUrl) row1.push({ text: '👤 Mở profile', url: profileUrl });
+    if (profileUrl) row1.push({ text: '👤 Open profile', url: profileUrl });
   }
   if (lead.permalink) {
-    row1.push({ text: '💬 Xem post', url: lead.permalink });
+    row1.push({ text: '💬 View post', url: lead.permalink });
   }
   const row2: TelegramInlineKeyboardButton[] = [
-    { text: '📊 Cập nhật stage', url: `${APP_BASE_URL}/#kanban?lead=${lead.lead_id}` },
+    { text: '📊 Update stage', url: `${APP_BASE_URL}/#kanban?lead=${lead.lead_id}` },
   ];
   const inlineKeyboard: TelegramInlineKeyboardButton[][] = row1.length ? [row1, row2] : [row2];
   // Block button — only present when Gemini extracted org_name. Tap suppresses
@@ -268,12 +268,19 @@ function formatVnTime(d: Date | string): string {
   }).format(date);
 }
 
-/** "5 phút trước" / "2 giờ trước" / "3 ngày trước". */
+/** "5 minutes ago" / "2 hours ago" / "3 days ago". */
 function humanizeAgo(d: Date | string): string {
   const t = typeof d === 'string' ? new Date(d).getTime() : d.getTime();
   const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
-  if (s < 60)      return `${s}s trước`;
-  if (s < 3600)    return `${Math.floor(s / 60)} phút trước`;
-  if (s < 86_400)  return `${Math.floor(s / 3600)} giờ trước`;
-  return `${Math.floor(s / 86_400)} ngày trước`;
+  if (s < 60)      return `${s}s ago`;
+  if (s < 3600) {
+    const m = Math.floor(s / 60);
+    return `${m} minute${m === 1 ? '' : 's'} ago`;
+  }
+  if (s < 86_400) {
+    const h = Math.floor(s / 3600);
+    return `${h} hour${h === 1 ? '' : 's'} ago`;
+  }
+  const days = Math.floor(s / 86_400);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }

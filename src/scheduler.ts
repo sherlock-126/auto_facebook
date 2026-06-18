@@ -37,8 +37,15 @@ const INCR = process.env.CRON_INCR ?? '*/30 * * * *';
 const FULL = process.env.CRON_FULL ?? '0 3 * * *';
 const OPS_HEALTH = process.env.CRON_OPS_HEALTH ?? '*/5 * * * *';
 
-cron.schedule(INCR, () => void trigger('incr', 'incr'));
-cron.schedule(FULL, () => void trigger('full', 'full'));
+// Cloud-only mode (prod cloud on nextclaw.vn): scraping runs on customer agents,
+// not here — so skip the local crawl triggers and keep only the ops-health monitor.
+const CLOUD_ONLY = process.env.CLOUD_ONLY === '1';
+if (!CLOUD_ONLY) {
+  cron.schedule(INCR, () => void trigger('incr', 'incr'));
+  cron.schedule(FULL, () => void trigger('full', 'full'));
+} else {
+  console.log('scheduler: CLOUD_ONLY=1 — skipping local crawl triggers (agents scrape on their own VPS)');
+}
 
 // Ops health: POST /api/ops/check-agent-health → Telegram alerts on transitions.
 async function triggerHealthCheck() {

@@ -1,0 +1,70 @@
+name: Deploy nextclaw (production)
+
+# Deploys the cloud-only app to the `second` server and serves it at nextclaw.vn.
+# Mirrors the sibling apps' pattern: push to main -> SSH -> git pull -> docker compose up --build.
+#
+# One-time setup on the server (manual, see docs): clone the repo to $APP_DIR, ensure
+# git can pull it, install Docker + nginx vhost + TLS for nextclaw.vn.
+#
+# Required GitHub repo secrets:
+#   PROD_HOST       public IP / host of `second`           (e.g. 103.166.183.165)
+#   PROD_USER       ssh user                                (e.g. root)
+#   PROD_SSH_PORT   ssh port                                (e.g. 24700)
+#   PROD_SSH_KEY    private SSH key with access to second
+#   SERVER_ENV      full contents of the production .env    (PG_*, JWT_SECRET, RESEND_*,
+#                   GEMINI_API_KEY, INTERNAL_API_TOKEN, ADMIN_EMAILS, DEFAULT_TENANT_ID,
+#                   APP_PUBLIC_BASE_URL=https://nextclaw.vn, NEXTCLAW_PORT, SESSION_*)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          port: ${{ secrets.PROD_SSH_PORT }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            APP_DIR=/root/nextclaw
+            REPO=https://github.com/sherlock-126/auto_facebook.git
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "first deploy — cloning repo"
+              git clone "$REPO" "$APP_DIR"
+            fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Write production .env from the SERVER_ENV secret.
+            cat > .env <<'ENVEOF'
+            ${{ secrets.SERVER_ENV }}
+            ENVEOF
+
+            # Build + (re)start the stack.
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            # Wait for the app health endpoint.
+            set -a; . ./.env; set +a
+            PORT="${NEXTCLAW_PORT:-4210}"
+            for i in $(seq 1 45); do
+              if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+                echo "health OK on :${PORT}"; exit 0
+              fi
+              sleep 4
+            done
+            echo "health check failed"; docker compose -f docker-compose.prod.yml logs --tail=80 app; exit 1

@@ -112,8 +112,8 @@ function variantKeyboard(): InlineKeyboardButton[][] {
       { text: '3', callback_data: 'cps_v:3' },
     ],
     [
-      { text: '🔄 Regen',  callback_data: 'cps_regen' },
-      { text: '❌ Huỷ',    callback_data: 'cps_cancel' },
+      { text: '🔄 Regenerate',  callback_data: 'cps_regen' },
+      { text: '❌ Cancel',    callback_data: 'cps_cancel' },
     ],
   ];
 }
@@ -127,7 +127,7 @@ function groupKeyboard(groups: { id: string; name: string }[]): InlineKeyboardBu
     }));
     rows.push(row);
   }
-  rows.push([{ text: '❌ Huỷ', callback_data: 'cps_cancel' }]);
+  rows.push([{ text: '❌ Cancel', callback_data: 'cps_cancel' }]);
   return rows;
 }
 
@@ -142,18 +142,18 @@ export async function handleComposeStart(
   const idea = ideaRaw.trim();
   if (!idea) {
     await setState({ tenant_id: tenantId, chat_id: chatId, state_name: 'compose_input_idea', payload: {} });
-    await sendMessage(botToken, chatId, '📝 Bạn muốn đăng nội dung gì? Gõ idea vào tin nhắn tiếp theo.\n\nVD: <i>bán hoa tươi tháng 6 giảm 20% giao SG</i>\n\nGõ /cancel để huỷ.');
+    await sendMessage(botToken, chatId, '📝 What would you like to post? Type your idea in the next message.\n\nExample: <i>fresh flowers, 20% off in June, delivery to Saigon</i>\n\nType /cancel to cancel.');
     return;
   }
   const groups = await listEnabledGroups(tenantId);
   if (!groups.length) {
-    await sendMessage(botToken, chatId, '⚠ Chưa bật group nào để đăng. Vào dashboard → Groups → bật ít nhất 1 group trước.');
+    await sendMessage(botToken, chatId, '⚠ No groups enabled for posting. Go to dashboard → Groups → enable at least 1 group first.');
     return;
   }
-  const status = await sendMessage(botToken, chatId, '⏳ Đang gen 3 phiên bản…');
+  const status = await sendMessage(botToken, chatId, '⏳ Generating 3 versions…');
   const variants = await genVariants(tenantId, idea);
   if (!variants || !variants.length) {
-    if (status.message_id) await editMessageText(botToken, chatId, status.message_id, '✗ Gen lỗi. Thử /post idea khác hoặc kiểm tra Gemini API key trong Settings.');
+    if (status.message_id) await editMessageText(botToken, chatId, status.message_id, '✗ Generation failed. Try a different /post idea or check your Gemini API key in Settings.');
     return;
   }
   if (status.message_id) {
@@ -178,26 +178,26 @@ export async function handleComposeCallback(
 ): Promise<void> {
   if (data === 'cps_cancel') {
     await clearState(tenantId, chatId);
-    await answerCallbackQuery(botToken, callbackId, 'Đã huỷ');
-    if (messageId) await editMessageText(botToken, chatId, messageId, '❌ Đã huỷ');
+    await answerCallbackQuery(botToken, callbackId, 'Cancelled');
+    if (messageId) await editMessageText(botToken, chatId, messageId, '❌ Cancelled');
     return;
   }
   const st = await getState(tenantId, chatId);
   if (!st) {
-    await answerCallbackQuery(botToken, callbackId, 'Phiên đã hết hạn, gõ /post lại');
+    await answerCallbackQuery(botToken, callbackId, 'Session expired, type /post again');
     return;
   }
   // Regen
   if (data === 'cps_regen' && st.state_name === 'compose_pick_variant') {
     const p = st.payload as VariantCacheEntry & { msg_id?: number };
     if ((p.regens || 0) >= MAX_REGENS) {
-      await answerCallbackQuery(botToken, callbackId, 'Đã regen 3 lần — thử idea mới');
+      await answerCallbackQuery(botToken, callbackId, 'Already regenerated 3 times — try a new idea');
       return;
     }
-    await answerCallbackQuery(botToken, callbackId, '⏳ Đang regen…');
+    await answerCallbackQuery(botToken, callbackId, '⏳ Regenerating…');
     const variants = await genVariants(tenantId, p.idea);
     if (!variants || !variants.length) {
-      if (messageId) await editMessageText(botToken, chatId, messageId, '✗ Gen lỗi. Thử /post idea khác.');
+      if (messageId) await editMessageText(botToken, chatId, messageId, '✗ Generation failed. Try a different /post idea.');
       await clearState(tenantId, chatId);
       return;
     }
@@ -214,13 +214,13 @@ export async function handleComposeCallback(
     const n = parseInt(data.slice(6), 10);
     const p = st.payload as VariantCacheEntry;
     const chosen = p.variants[n - 1];
-    if (!chosen) { await answerCallbackQuery(botToken, callbackId, 'Variant không tồn tại'); return; }
+    if (!chosen) { await answerCallbackQuery(botToken, callbackId, 'Variant does not exist'); return; }
     const groups = await listEnabledGroups(tenantId);
-    if (!groups.length) { await answerCallbackQuery(botToken, callbackId, 'Chưa bật group nào'); return; }
-    await answerCallbackQuery(botToken, callbackId, `✓ Chọn variant ${n}`);
+    if (!groups.length) { await answerCallbackQuery(botToken, callbackId, 'No groups enabled'); return; }
+    await answerCallbackQuery(botToken, callbackId, `✓ Selected variant ${n}`);
     if (messageId) {
       await editMessageText(botToken, chatId, messageId,
-        `✓ <b>Chọn variant ${n}</b>\n\n<i>${escapeHtml(chosen.slice(0, 600))}</i>\n\n📍 <b>Đăng vào group nào?</b>`,
+        `✓ <b>Selected variant ${n}</b>\n\n<i>${escapeHtml(chosen.slice(0, 600))}</i>\n\n📍 <b>Which group to post to?</b>`,
         { replyMarkup: { inline_keyboard: groupKeyboard(groups) } },
       );
     }
@@ -239,7 +239,7 @@ export async function handleComposeCallback(
       `SELECT name FROM dim_group WHERE tenant_id = $1 AND group_id = $2 AND enabled = TRUE`,
       [tenantId, groupId],
     );
-    if (!rows[0]) { await answerCallbackQuery(botToken, callbackId, 'Group không tồn tại / chưa bật'); return; }
+    if (!rows[0]) { await answerCallbackQuery(botToken, callbackId, 'Group does not exist / not enabled'); return; }
     const groupName = rows[0].name || groupId;
     const { rows: ins } = await pool.query(
       `INSERT INTO fb_post_queue (tenant_id, group_id, content, schedule_at, status, created_by, bot_chat_id, bot_message_id)
@@ -248,13 +248,13 @@ export async function handleComposeCallback(
       [tenantId, groupId, p.content, `telegram:${userId ?? '?'}`, chatId, messageId],
     );
     await clearState(tenantId, chatId);
-    await answerCallbackQuery(botToken, callbackId, '✓ Đã queue');
+    await answerCallbackQuery(botToken, callbackId, '✓ Queued');
     if (messageId) {
       await editMessageText(botToken, chatId, messageId,
-        `✓ <b>Đã queue (#${ins[0].id})</b>\n\n📍 Group: <b>${escapeHtml(groupName)}</b>\n\n<i>${escapeHtml(p.content.slice(0, 400))}</i>\n\n⏳ Agent sẽ đăng trong ~30-60s. Bot sẽ báo khi xong.`,
+        `✓ <b>Queued (#${ins[0].id})</b>\n\n📍 Group: <b>${escapeHtml(groupName)}</b>\n\n<i>${escapeHtml(p.content.slice(0, 400))}</i>\n\n⏳ The agent will post in ~30-60s. The bot will let you know when it is done.`,
       );
     }
     return;
   }
-  await answerCallbackQuery(botToken, callbackId, 'Lệnh không hợp lệ');
+  await answerCallbackQuery(botToken, callbackId, 'Invalid command');
 }

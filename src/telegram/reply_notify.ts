@@ -37,7 +37,7 @@ function replyKeyboard(replyId: number | bigint): InlineKeyboardButton[][] {
   const id = String(replyId);
   return [
     [
-      { text: '✓ Gửi',  callback_data: `rpl_ok:${id}` },
+      { text: '✓ Send',  callback_data: `rpl_ok:${id}` },
       { text: '✏ Edit', callback_data: `rpl_ed:${id}` },
       { text: '✗ Skip', callback_data: `rpl_no:${id}` },
     ],
@@ -46,18 +46,18 @@ function replyKeyboard(replyId: number | bigint): InlineKeyboardButton[][] {
 
 function cardText(a: NotifyArgs): string {
   const lines = [
-    `💬 <b>Lead mới — cần duyệt reply</b>`,
+    `💬 <b>New lead — reply needs approval</b>`,
     '',
   ];
   if (a.groupName) lines.push(`📍 ${escapeHtml(a.groupName)}`);
   if (a.intent)    lines.push(`🏷 <i>${escapeHtml(a.intent)}</i>`);
   if (a.authorName) lines.push(`👤 ${escapeHtml(a.authorName)}`);
-  if (a.postPermalink) lines.push(`<a href="${escapeHtml(a.postPermalink)}">📎 Xem post</a>`);
+  if (a.postPermalink) lines.push(`<a href="${escapeHtml(a.postPermalink)}">📎 View post</a>`);
   lines.push('');
-  lines.push(`<b>Post của khách:</b>`);
+  lines.push(`<b>Customer's post:</b>`);
   lines.push(`<i>${escapeHtml((a.postMessage || '').slice(0, 600))}</i>`);
   lines.push('');
-  lines.push(`<b>💬 AI suggest:</b>`);
+  lines.push(`<b>💬 AI suggestion:</b>`);
   lines.push(escapeHtml(a.suggestedText));
   return lines.join('\n');
 }
@@ -100,11 +100,11 @@ export async function notifyReplyResult(
   const body = r.final_text || r.suggested_text;
   let txt: string;
   if (status === 'sent') {
-    txt = `✓ <b>Đã gửi reply</b>${fbCommentUrl ? `\n<a href="${escapeHtml(fbCommentUrl)}">📎 Xem comment</a>` : ''}\n\n<i>${escapeHtml((body || '').slice(0, 400))}</i>`;
+    txt = `✓ <b>Reply sent</b>${fbCommentUrl ? `\n<a href="${escapeHtml(fbCommentUrl)}">📎 View comment</a>` : ''}\n\n<i>${escapeHtml((body || '').slice(0, 400))}</i>`;
   } else if (status === 'rate_limited') {
-    txt = `⏳ <b>FB rate-limited</b> — reply sẽ thử lại sau\n\n<i>${escapeHtml((body || '').slice(0, 400))}</i>`;
+    txt = `⏳ <b>FB rate-limited</b> — the reply will be retried later\n\n<i>${escapeHtml((body || '').slice(0, 400))}</i>`;
   } else {
-    txt = `✗ <b>Lỗi gửi reply</b>: ${escapeHtml((error || '').slice(0, 200))}\n\n<i>${escapeHtml((body || '').slice(0, 400))}</i>`;
+    txt = `✗ <b>Failed to send reply</b>: ${escapeHtml((error || '').slice(0, 200))}\n\n<i>${escapeHtml((body || '').slice(0, 400))}</i>`;
   }
   await editMessageText(cfg.telegram_bot_token, r.bot_chat_id, r.bot_message_id, txt);
 }
@@ -129,13 +129,13 @@ export async function notifyPostResult(
   if (!cfg.telegram_bot_token) return;
   let txt: string;
   if (status === 'posted') {
-    txt = `✓ <b>Đã đăng bài</b>${fbPostUrl ? `\n<a href="${escapeHtml(fbPostUrl)}">📎 Xem bài</a>` : ''}\n\n📍 ${escapeHtml(r.group_name || '')}\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
+    txt = `✓ <b>Post published</b>${fbPostUrl ? `\n<a href="${escapeHtml(fbPostUrl)}">📎 View post</a>` : ''}\n\n📍 ${escapeHtml(r.group_name || '')}\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
   } else if (status === 'pending_review') {
-    txt = `⏳ <b>Đang chờ admin group duyệt</b>\n\n📍 ${escapeHtml(r.group_name || '')}\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
+    txt = `⏳ <b>Waiting for group admin approval</b>\n\n📍 ${escapeHtml(r.group_name || '')}\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
   } else if (status === 'rate_limited') {
-    txt = `⏳ <b>FB rate-limited</b> — đợi 1-2h rồi /post lại\n\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
+    txt = `⏳ <b>FB rate-limited</b> — wait 1-2h then /post again\n\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
   } else {
-    txt = `✗ <b>Lỗi đăng bài</b>: ${escapeHtml((error || '').slice(0, 200))}\n\n📍 ${escapeHtml(r.group_name || '')}\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
+    txt = `✗ <b>Failed to publish post</b>: ${escapeHtml((error || '').slice(0, 200))}\n\n📍 ${escapeHtml(r.group_name || '')}\n<i>${escapeHtml((r.content || '').slice(0, 400))}</i>`;
   }
   await editMessageText(cfg.telegram_bot_token, r.bot_chat_id, r.bot_message_id, txt);
 }
@@ -169,11 +169,11 @@ export async function handleReplyCallback(
        RETURNING id, post_permalink, COALESCE(final_text, suggested_text) AS body`,
       [id, userEmail ?? 'telegram', tenantId],
     );
-    if (!rows[0]) { await answerCallbackQuery(botToken, callbackId, 'Reply không còn pending'); return; }
+    if (!rows[0]) { await answerCallbackQuery(botToken, callbackId, 'Reply is no longer pending'); return; }
     if (!rows[0].post_permalink) {
       await pool.query(`UPDATE fb_reply_queue SET status='failed', error='no_post_permalink' WHERE id=$1`, [id]);
-      await answerCallbackQuery(botToken, callbackId, 'Thiếu post permalink');
-      if (messageId) await editMessageText(botToken, chatId, messageId, '✗ Reply lỗi: post không có permalink');
+      await answerCallbackQuery(botToken, callbackId, 'Missing post permalink');
+      if (messageId) await editMessageText(botToken, chatId, messageId, '✗ Reply failed: post has no permalink');
       return;
     }
     await pool.query(
@@ -181,10 +181,10 @@ export async function handleReplyCallback(
        VALUES ($1, 'comment_on_post', $2::jsonb)`,
       [tenantId, JSON.stringify({ action_id: rows[0].id, post_url: rows[0].post_permalink, content: rows[0].body })],
     );
-    await answerCallbackQuery(botToken, callbackId, '✓ Đã queue');
+    await answerCallbackQuery(botToken, callbackId, '✓ Queued');
     if (messageId) {
       await editMessageText(botToken, chatId, messageId,
-        `⏳ <b>Đang gửi reply…</b>\n\n<i>${escapeHtml((rows[0].body || '').slice(0, 400))}</i>`);
+        `⏳ <b>Sending reply…</b>\n\n<i>${escapeHtml((rows[0].body || '').slice(0, 400))}</i>`);
     }
     return;
   }
@@ -194,8 +194,8 @@ export async function handleReplyCallback(
       `UPDATE fb_reply_queue SET status='skipped' WHERE id=$1 AND tenant_id=$2 AND status='pending_review'`,
       [id, tenantId],
     );
-    await answerCallbackQuery(botToken, callbackId, rowCount ? 'Đã skip' : 'Không còn pending');
-    if (messageId && rowCount) await editMessageText(botToken, chatId, messageId, '✗ Đã bỏ qua');
+    await answerCallbackQuery(botToken, callbackId, rowCount ? 'Skipped' : 'No longer pending');
+    if (messageId && rowCount) await editMessageText(botToken, chatId, messageId, '✗ Skipped');
     return;
   }
 
@@ -207,11 +207,11 @@ export async function handleReplyCallback(
       payload: { reply_id: id, card_message_id: messageId },
     });
     await answerCallbackQuery(botToken, callbackId);
-    await sendMessage(botToken, chatId, '✏ <b>Gõ reply mới</b> (tin nhắn tiếp theo). Bot sẽ auto-gửi sau khi nhận text. Gõ /cancel để huỷ.');
+    await sendMessage(botToken, chatId, '✏ <b>Type the new reply</b> (in the next message). The bot will auto-send once it receives your text. Type /cancel to cancel.');
     return;
   }
 
-  await answerCallbackQuery(botToken, callbackId, 'Lệnh không hợp lệ');
+  await answerCallbackQuery(botToken, callbackId, 'Invalid command');
 }
 
 /**
@@ -231,7 +231,7 @@ export async function handleReplyEditText(
   await clearState(tenantId, chatId);
   const body = newText.trim();
   if (body.length < 3) {
-    await sendMessage(botToken, chatId, '✗ Reply quá ngắn (cần ≥3 ký tự).');
+    await sendMessage(botToken, chatId, '✗ Reply too short (needs at least 3 characters).');
     return;
   }
   const { rows } = await pool.query(
@@ -242,12 +242,12 @@ export async function handleReplyEditText(
     [replyId, body, userEmail ?? 'telegram-edit', tenantId],
   );
   if (!rows[0]) {
-    await sendMessage(botToken, chatId, '✗ Reply không còn pending (đã được duyệt / skip ở chỗ khác?).');
+    await sendMessage(botToken, chatId, '✗ Reply is no longer pending (already approved / skipped elsewhere?).');
     return;
   }
   if (!rows[0].post_permalink) {
     await pool.query(`UPDATE fb_reply_queue SET status='failed', error='no_post_permalink' WHERE id=$1`, [replyId]);
-    await sendMessage(botToken, chatId, '✗ Lỗi: post không có permalink.');
+    await sendMessage(botToken, chatId, '✗ Error: post has no permalink.');
     return;
   }
   await pool.query(
@@ -257,8 +257,8 @@ export async function handleReplyEditText(
   );
   if (cardMessageId) {
     await editMessageText(botToken, chatId, cardMessageId,
-      `⏳ <b>Đang gửi reply (edited)…</b>\n\n<i>${escapeHtml(body.slice(0, 400))}</i>`);
+      `⏳ <b>Sending reply (edited)…</b>\n\n<i>${escapeHtml(body.slice(0, 400))}</i>`);
   } else {
-    await sendMessage(botToken, chatId, `⏳ <b>Đã queue reply</b>\n\n<i>${escapeHtml(body.slice(0, 400))}</i>`);
+    await sendMessage(botToken, chatId, `⏳ <b>Reply queued</b>\n\n<i>${escapeHtml(body.slice(0, 400))}</i>`);
   }
 }

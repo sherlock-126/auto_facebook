@@ -43,12 +43,12 @@ async function lookupBySecret(secret: string): Promise<TenantLookup | null> {
 
 const HELP_TEXT = `<b>auto_facebook bot</b>
 
-<b>/post &lt;idea&gt;</b> — gen 3 phiên bản post + đăng vào group
-<b>/post</b> — không có idea, bot sẽ hỏi
-<b>/cancel</b> — huỷ flow hiện tại
-<b>/help</b> — show menu này
+<b>/post &lt;idea&gt;</b> — generate 3 post versions + publish to a group
+<b>/post</b> — no idea given, the bot will ask
+<b>/cancel</b> — cancel the current flow
+<b>/help</b> — show this menu
 
-Khi có lead mới (đã bật auto-reply), bot sẽ push card có nút <b>✓ Gửi / ✏ Edit / ✗ Skip</b> để duyệt reply.`;
+When a new lead arrives (with auto-reply enabled), the bot pushes a card with <b>✓ Send / ✏ Edit / ✗ Skip</b> buttons to approve the reply.`;
 
 export async function registerTelegramWebhook(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { secret: string }; Body: any }>('/api/telegram/wh/:secret', async (req, reply) => {
@@ -110,7 +110,7 @@ async function processUpdate(t: TenantLookup, upd: any): Promise<void> {
   }
   if (text === '/cancel') {
     await clearState(t.tenant_id, chatId);
-    await sendMessage(t.bot_token, chatId, '❌ Đã huỷ flow hiện tại.');
+    await sendMessage(t.bot_token, chatId, '❌ Current flow cancelled.');
     return;
   }
   if (text.startsWith('/post')) {

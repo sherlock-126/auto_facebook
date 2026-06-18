@@ -226,90 +226,103 @@ function cryptoRandom(n: number): string {
 // =====================================================================
 function renderAdmin(): string {
   return `<!doctype html>
-<html lang="vi"><head>
+<html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin · fb.autonow.vn</title>
+<title>Admin · nextclaw</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  :root{
+    --ink:#0E1430; --ink-2:#131A3B; --text:#EAEDF7; --muted:#9AA3C7; --noise:#525a82;
+    --signal:#C2F24A; --signal-ink:#0E1430; --mint:#7CE3C4; --line:#242C57;
+    --display:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;
+    --body:'Inter',ui-sans-serif,system-ui,sans-serif;
+    --mono:'Space Mono',ui-monospace,monospace;
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1020; color: #e8ecf3; }
+  html, body { margin: 0; padding: 0; font-family: var(--body); background: var(--ink); color: var(--text);
+    background-image: radial-gradient(900px 520px at 50% -12%, rgba(194,242,74,.06), transparent 60%); -webkit-font-smoothing: antialiased; }
 
-  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; border-bottom: 1px solid #1c2546; background: #0e1530; }
-  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
-  header h1 small { color: #8a96bd; font-size: 11px; font-weight: 400; margin-left: 8px; }
-  header a { color: #7ea7ff; text-decoration: none; font-size: 13px; margin-left: 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--ink-2); }
+  header h1 { font-family: var(--display); font-size: 16px; margin: 0; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; }
+  header h1 .mark { color: var(--signal); }
+  header h1 small { color: var(--noise); font-family: var(--mono); font-size: 11px; font-weight: 400; margin-left: 8px; letter-spacing: .05em; }
+  header a { color: var(--mint); text-decoration: none; font-size: 13px; margin-left: 16px; }
   header a:hover { text-decoration: underline; }
 
-  .tabs { display: flex; padding: 0 24px; border-bottom: 1px solid #1c2546; background: #0e1530; }
-  .tabs button { background: transparent; border: 0; color: #a9b3d1; font: inherit; padding: 12px 18px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; }
-  .tabs button:hover { color: #e8ecf3; }
-  .tabs button.active { color: #fff; border-bottom-color: #3b6ef0; }
+  .tabs { display: flex; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--ink-2); }
+  .tabs button { background: transparent; border: 0; color: var(--muted); font-family: var(--body); font-size: 13px; padding: 12px 18px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--signal); }
 
   main { padding: 24px; max-width: 1400px; margin: 0 auto; }
   .tab { display: none; }
   .tab.active { display: block; }
 
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
-  .toolbar h2 { margin: 0; font-size: 18px; }
-  .toolbar .count { font-size: 12px; color: #8a96bd; }
-  button.btn, .btn { padding: 7px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 0; font-family: inherit; }
-  .btn-primary { background: #3b6ef0; color: #fff; }
-  .btn-primary:hover { filter: brightness(1.1); }
-  .btn-danger { background: #b03a4a; color: #fff; }
-  .btn-ghost { background: #1c2546; color: #cad3ed; }
-  .btn-ghost:hover { background: #232d56; }
+  .toolbar h2 { margin: 0; font-size: 18px; font-family: var(--display); font-weight: 600; letter-spacing: -.02em; }
+  .toolbar .count { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  button.btn, .btn { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 0; font-family: var(--body); transition: transform .12s ease, filter .15s; }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.04); }
+  .btn-primary { background: var(--signal); color: var(--signal-ink); }
+  .btn-danger { background: rgba(255,120,130,.1); color: #ff9aa3; border: 1px solid rgba(255,120,130,.25); }
+  .btn-ghost { background: var(--ink); color: var(--text); border: 1px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--noise); }
 
-  table { width: 100%; border-collapse: collapse; background: #131a33; border: 1px solid #222a4a; border-radius: 8px; overflow: hidden; }
-  th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8a96bd; font-weight: 600; padding: 10px 12px; background: #0e1530; border-bottom: 1px solid #1c2546; }
-  td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #1c2546; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; font-family: var(--mono); letter-spacing: .04em; padding: 10px 12px; background: var(--ink); border-bottom: 1px solid var(--line); }
+  td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   tr:last-child td { border-bottom: 0; }
-  tr:hover td { background: #161e3a; }
-  td.muted { color: #8a96bd; }
-  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; background: #0a0f24; padding: 2px 6px; border-radius: 3px; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; background: #1c2546; color: #cad3ed; }
-  .pill-ok { background: #1f3f2a; color: #9eecbe; }
-  .pill-warn { background: #3a2e1c; color: #ffe0a6; }
-  .pill-err { background: #3a1c28; color: #ff9aa3; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  td.muted { color: var(--muted); }
+  code { font-family: var(--mono); font-size: 11px; background: var(--ink); padding: 2px 6px; border-radius: 4px; color: var(--mint); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-family: var(--mono); background: var(--ink); color: var(--muted); border: 1px solid var(--line); }
+  .pill-ok { background: rgba(124,227,196,.1); color: var(--mint); border-color: rgba(124,227,196,.3); }
+  .pill-warn { background: rgba(255,224,166,.08); color: #ffe0a6; border-color: rgba(255,224,166,.25); }
+  .pill-err { background: rgba(255,120,130,.08); color: #ff9aa3; border-color: rgba(255,120,130,.25); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .actions button { font-size: 11px; padding: 4px 8px; }
 
   /* Create form */
-  .form-card { background: #131a33; border: 1px solid #222a4a; border-radius: 8px; padding: 22px; max-width: 520px; }
-  .form-card label { display: block; font-size: 12px; color: #a9b3d1; margin: 12px 0 4px; }
-  .form-card input { width: 100%; background: #0a0f24; color: #e8ecf3; border: 1px solid #222a4a; border-radius: 5px; padding: 8px 12px; font-size: 14px; font-family: inherit; }
-  .form-card input:focus { outline: none; border-color: #3b6ef0; }
-  .form-card .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: #cad3ed; }
-  .form-card .row input[type=checkbox] { width: auto; }
-  .form-card .hint { font-size: 11px; color: #8a96bd; margin-top: 4px; }
-  .form-card button { margin-top: 18px; width: 100%; padding: 10px; }
+  .form-card { background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; padding: 22px; max-width: 520px; }
+  .form-card label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; font-weight: 500; }
+  .form-card input { width: 100%; background: var(--ink); color: var(--text); border: 1px solid var(--line); border-radius: 9px; padding: 10px 13px; font-size: 14px; font-family: var(--body); }
+  .form-card input::placeholder { color: var(--noise); }
+  .form-card input:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px rgba(194,242,74,.12); }
+  .form-card .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--text); }
+  .form-card .row input[type=checkbox] { width: auto; accent-color: var(--signal); }
+  .form-card .hint { font-size: 11px; color: var(--noise); margin-top: 4px; }
+  .form-card button { margin-top: 18px; width: 100%; padding: 12px; }
 
-  #toast { position: fixed; top: 16px; right: 16px; padding: 12px 16px; border-radius: 6px; font-size: 13px; max-width: 380px; display: none; }
+  #toast { position: fixed; top: 16px; right: 16px; padding: 12px 16px; border-radius: 9px; font-size: 13px; max-width: 380px; display: none; font-family: var(--body); }
   #toast.show { display: block; }
-  #toast.ok { background: #1f3f2a; color: #9eecbe; border: 1px solid #2a5a3b; }
-  #toast.err { background: #3a1c28; color: #ff9aa3; border: 1px solid #4a1f24; }
+  #toast.ok { background: rgba(124,227,196,.1); color: var(--mint); border: 1px solid rgba(124,227,196,.3); }
+  #toast.err { background: rgba(255,120,130,.08); color: #ff9aa3; border: 1px solid rgba(255,120,130,.25); }
 
   #result-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 100; }
   #result-modal.show { display: flex; }
-  #result-modal .box { background: #131a33; border: 1px solid #2a3560; border-radius: 10px; padding: 26px; max-width: 520px; width: 90%; }
-  #result-modal h3 { margin: 0 0 14px; font-size: 18px; }
+  #result-modal .box { background: var(--ink-2); border: 1px solid var(--line); border-radius: 16px; padding: 26px; max-width: 520px; width: 90%; box-shadow: 0 30px 80px -40px rgba(0,0,0,.7); }
+  #result-modal h3 { margin: 0 0 14px; font-size: 18px; font-family: var(--display); font-weight: 600; letter-spacing: -.02em; }
   #result-modal .field { margin: 10px 0; font-size: 13px; }
-  #result-modal .field label { display: block; font-size: 11px; color: #8a96bd; text-transform: uppercase; margin-bottom: 4px; }
-  #result-modal .field .val { background: #0a0f24; padding: 8px 10px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  #result-modal .field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; font-family: var(--mono); letter-spacing: .04em; margin-bottom: 4px; }
+  #result-modal .field .val { background: var(--ink); padding: 8px 10px; border-radius: 6px; font-family: var(--mono); font-size: 12px; word-break: break-all; color: var(--mint); }
 </style>
 </head><body>
 
 <header>
-  <h1>Admin Panel <small>fb.autonow.vn</small></h1>
+  <h1><span class="mark">&#9670;</span>nextclaw <small>· admin</small></h1>
   <div>
     <a href="/">← Dashboard</a>
-    <a href="#" id="logoutBtn">Đăng xuất</a>
+    <a href="#" id="logoutBtn">Log out</a>
   </div>
 </header>
 
 <div class="tabs">
   <button data-tab="tenants" class="active">Tenants</button>
   <button data-tab="users">Users</button>
-  <button data-tab="create">+ Tạo user mới</button>
+  <button data-tab="create">+ New user</button>
 </div>
 
 <main>
@@ -323,17 +336,17 @@ function renderAdmin(): string {
     <thead><tr>
       <th>Tenant</th>
       <th title="Agent online/stale/offline + heartbeat freshness">Agent</th>
-      <th title="FB account session alive (false = cần re-login qua noVNC)">FB</th>
-      <th title="Disk used % trên VPS agent">Disk</th>
-      <th title="Số groups đang enabled crawl">Groups</th>
-      <th title="Lead phát hiện 24h qua">Leads 24h</th>
-      <th title="Lead gần nhất">Last lead</th>
-      <th title="Gemini cost ước tính 24h (USD)">Gemini $</th>
-      <th title="Key Gemini riêng / Telegram bot configured">Cfg</th>
+      <th title="FB account session alive (false = needs re-login via noVNC)">FB</th>
+      <th title="Disk used % on the VPS agent">Disk</th>
+      <th title="Groups currently enabled for crawling">Groups</th>
+      <th title="Leads detected in the last 24h">Leads 24h</th>
+      <th title="Most recent lead">Last lead</th>
+      <th title="Estimated Gemini cost, last 24h (USD)">Gemini $</th>
+      <th title="Own Gemini key / Telegram bot configured">Cfg</th>
       <th>Health</th>
       <th></th>
     </tr></thead>
-    <tbody id="tenantsBody"><tr><td colspan="11" class="muted">Đang tải…</td></tr></tbody>
+    <tbody id="tenantsBody"><tr><td colspan="11" class="muted">Loading…</td></tr></tbody>
   </table>
 </div>
 
@@ -344,37 +357,37 @@ function renderAdmin(): string {
   </div>
   <table>
     <thead><tr>
-      <th>Email</th><th>Workspace</th><th>Role</th><th>Email verified</th><th>Approval</th><th>Last login</th><th>Tạo</th><th>License</th><th></th>
+      <th>Email</th><th>Workspace</th><th>Role</th><th>Email verified</th><th>Activation</th><th>Last login</th><th>Created</th><th>License</th><th></th>
     </tr></thead>
-    <tbody id="usersBody"><tr><td colspan="9" class="muted">Đang tải…</td></tr></tbody>
+    <tbody id="usersBody"><tr><td colspan="9" class="muted">Loading…</td></tr></tbody>
   </table>
 </div>
 
 <div class="tab" id="tab-create">
-  <div class="toolbar"><h2>Tạo user mới (skip signup flow)</h2></div>
+  <div class="toolbar"><h2>New user (skip signup flow)</h2></div>
   <div class="form-card">
     <form id="createForm">
       <label>Email <span style="color:#ff9aa3;">*</span></label>
       <input name="email" type="email" required placeholder="customer@example.com">
 
-      <label>Tên workspace</label>
-      <input name="tenant_name" placeholder="(để trống = lấy từ email)">
+      <label>Workspace name</label>
+      <input name="tenant_name" placeholder="(blank = derived from email)">
 
-      <label>Mật khẩu</label>
-      <input name="password" type="text" placeholder="(để trống = hệ thống tự tạo password tạm)">
-      <div class="hint">Min 8 ký tự nếu nhập</div>
+      <label>Password</label>
+      <input name="password" type="text" placeholder="(blank = auto-generate a temporary password)">
+      <div class="hint">At least 8 characters if you set one</div>
 
       <div class="row">
         <input type="checkbox" id="auto_verify" name="auto_verify" checked>
-        <label for="auto_verify" style="margin: 0;">Auto-verify email (skip bước user phải click link)</label>
+        <label for="auto_verify" style="margin: 0;">Auto-verify email (skip the link-click step)</label>
       </div>
 
       <div class="row">
         <input type="checkbox" id="send_welcome" name="send_welcome" checked>
-        <label for="send_welcome" style="margin: 0;">Gửi welcome email kèm license + lệnh cài agent</label>
+        <label for="send_welcome" style="margin: 0;">Send welcome email with license + install command</label>
       </div>
 
-      <button class="btn btn-primary" type="submit" id="createBtn">Tạo user</button>
+      <button class="btn btn-primary" type="submit" id="createBtn">Create user</button>
     </form>
   </div>
 </div>
@@ -385,13 +398,13 @@ function renderAdmin(): string {
 
 <div id="result-modal">
   <div class="box">
-    <h3>✅ User đã được tạo</h3>
+    <h3>✅ User created</h3>
     <div class="field"><label>Email</label><div class="val" id="r-email"></div></div>
     <div class="field"><label>Tenant ID (workspace)</label><div class="val" id="r-tenant"></div></div>
     <div class="field"><label>License key</label><div class="val" id="r-license"></div></div>
-    <div class="field" id="r-pwd-wrap"><label>Mật khẩu tạm (chỉ hiện 1 lần)</label><div class="val" id="r-pwd"></div></div>
+    <div class="field" id="r-pwd-wrap"><label>Temporary password (shown once)</label><div class="val" id="r-pwd"></div></div>
     <div style="margin-top: 18px; display: flex; gap: 10px;">
-      <button class="btn btn-ghost" onclick="document.getElementById('result-modal').classList.remove('show')">Đóng</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('result-modal').classList.remove('show')">Close</button>
       <button class="btn btn-primary" onclick="copyAll()">📋 Copy info</button>
     </div>
   </div>
@@ -416,19 +429,19 @@ function fmtDate(d) {
   if (!d) return '<span class="muted">—</span>';
   var dt = new Date(d);
   if (isNaN(dt)) return esc(d);
-  return dt.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  return dt.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 // Agent status pill — computed from last_seen_at age (thresholds mirror
 // src/agent/status.ts: online ≤ 180s, stale ≤ 900s, else offline).
 function renderAgentPill(lastSeenAt) {
-  if (!lastSeenAt) return '<span class="pill pill-err">⚪ chưa cài</span>';
+  if (!lastSeenAt) return '<span class="pill">⚪ not installed</span>';
   var t = new Date(lastSeenAt);
-  if (isNaN(t)) return '<span class="pill pill-err">⚪ chưa cài</span>';
+  if (isNaN(t)) return '<span class="pill">⚪ not installed</span>';
   var ageSec = Math.round((Date.now() - t.getTime()) / 1000);
-  var ageTxt = ageSec < 60 ? ageSec + 's trước'
-             : ageSec < 3600 ? Math.round(ageSec / 60) + ' phút trước'
-             : Math.round(ageSec / 3600) + ' giờ trước';
+  var ageTxt = ageSec < 60 ? ageSec + 's ago'
+             : ageSec < 3600 ? Math.round(ageSec / 60) + 'm ago'
+             : Math.round(ageSec / 3600) + 'h ago';
   if (ageSec <= 180) return '<span class="pill pill-ok" title="Last seen ' + esc(lastSeenAt) + '">🟢 online · ' + ageTxt + '</span>';
   if (ageSec <= 900) return '<span class="pill pill-warn" title="Last seen ' + esc(lastSeenAt) + '">🟡 stale · ' + ageTxt + '</span>';
   return '<span class="pill pill-err" title="Last seen ' + esc(lastSeenAt) + '">🔴 offline · ' + ageTxt + '</span>';
@@ -456,12 +469,12 @@ document.getElementById('logoutBtn').addEventListener('click', function(e) {
 // ---- Tenants ----
 async function loadTenants() {
   var body = document.getElementById('tenantsBody');
-  body.innerHTML = '<tr><td colspan="11" class="muted">Đang tải…</td></tr>';
+  body.innerHTML = '<tr><td colspan="11" class="muted">Loading…</td></tr>';
   try {
     var r = await fetch('/api/admin/tenants', { credentials: 'same-origin' });
     var j = await r.json();
-    document.getElementById('tenantsCount').textContent = j.rows.length + ' tenant';
-    if (!j.rows.length) { body.innerHTML = '<tr><td colspan="11" class="muted">Chưa có tenant nào</td></tr>'; return; }
+    document.getElementById('tenantsCount').textContent = j.rows.length + ' tenants';
+    if (!j.rows.length) { body.innerHTML = '<tr><td colspan="11" class="muted">No tenants yet</td></tr>'; return; }
     body.innerHTML = j.rows.map(function(t) {
       var agent = renderAgentPill(t.agent_last_seen);
       // FB session pill: green if alive, red if dead, gray if unknown.
@@ -494,50 +507,50 @@ async function loadTenants() {
         '<td>' + cost + '</td>' +
         '<td>' + cfg + '</td>' +
         '<td>' + health + '</td>' +
-        '<td class="actions"><button class="btn btn-danger" onclick="deleteTenant(\\''+ esc(t.tenant_id) +'\\', \\'' + esc(t.name) + '\\')">Xoá</button></td>' +
+        '<td class="actions"><button class="btn btn-danger" onclick="deleteTenant(\\''+ esc(t.tenant_id) +'\\', \\'' + esc(t.name) + '\\')">Delete</button></td>' +
       '</tr>';
     }).join('');
   } catch (e) {
-    body.innerHTML = '<tr><td colspan="11" class="muted">Lỗi: ' + esc(e.message) + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="11" class="muted">Error: ' + esc(e.message) + '</td></tr>';
   }
 }
 
 async function deleteTenant(id, name) {
-  if (id === 'default') { toast('err', 'Không thể xoá tenant default'); return; }
-  if (id === 'tuantran') { if (!confirm('CẢNH BÁO: Đây là tenant chính. Vẫn xoá?')) return; }
-  if (!confirm('Xoá tenant "' + name + '" (' + id + ')? Sẽ mất toàn bộ data + users.')) return;
+  if (id === 'default') { toast('err', 'Cannot delete the default tenant'); return; }
+  if (id === 'tuantran') { if (!confirm('WARNING: this is the primary tenant. Delete anyway?')) return; }
+  if (!confirm('Delete tenant "' + name + '" (' + id + ')? This wipes all data and users.')) return;
   try {
     var r = await fetch('/api/admin/tenants/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' });
     var j = await r.json();
-    if (j.ok) { toast('ok', 'Đã xoá tenant ' + id); loadTenants(); }
-    else { toast('err', j.message || 'Xoá thất bại'); }
+    if (j.ok) { toast('ok', 'Deleted tenant ' + id); loadTenants(); }
+    else { toast('err', j.message || 'Delete failed'); }
   } catch (e) { toast('err', e.message); }
 }
 
 // ---- Users ----
 async function loadUsers() {
   var body = document.getElementById('usersBody');
-  body.innerHTML = '<tr><td colspan="9" class="muted">Đang tải…</td></tr>';
+  body.innerHTML = '<tr><td colspan="9" class="muted">Loading…</td></tr>';
   try {
     var r = await fetch('/api/admin/users', { credentials: 'same-origin' });
     var j = await r.json();
     var pending = j.rows.filter(function(u){ return u.email_verified_at && !u.approved_at; }).length;
-    document.getElementById('usersCount').textContent = j.rows.length + ' user' + (pending ? ' · ' + pending + ' chờ duyệt' : '');
-    if (!j.rows.length) { body.innerHTML = '<tr><td colspan="9" class="muted">Chưa có user nào</td></tr>'; return; }
+    document.getElementById('usersCount').textContent = j.rows.length + ' users' + (pending ? ' · ' + pending + ' awaiting activation' : '');
+    if (!j.rows.length) { body.innerHTML = '<tr><td colspan="9" class="muted">No users yet</td></tr>'; return; }
     body.innerHTML = j.rows.map(function(u) {
       var verifyPill = u.email_verified_at
         ? '<span class="pill pill-ok">✓ ' + fmtDate(u.email_verified_at) + '</span>'
-        : '<span class="pill pill-warn">⏳ chưa verify</span>';
+        : '<span class="pill pill-warn">⏳ not verified</span>';
       var approvalPill;
       var rowHighlight = '';
       if (u.approved_at) {
         approvalPill = '<span class="pill pill-ok">✓ ' + fmtDate(u.approved_at) + '</span>'
-                     + (u.approved_by ? '<br><span class="muted" style="font-size:10px;">bởi ' + esc(u.approved_by) + '</span>' : '');
+                     + (u.approved_by ? '<br><span class="muted" style="font-size:10px;">by ' + esc(u.approved_by) + '</span>' : '');
       } else if (u.email_verified_at) {
-        approvalPill = '<span class="pill pill-warn">⏳ Chờ admin duyệt</span>';
-        rowHighlight = ' style="background:#1a2240;"';
+        approvalPill = '<span class="pill pill-warn">⏳ Awaiting activation</span>';
+        rowHighlight = ' style="background:rgba(194,242,74,.05);"';
       } else {
-        approvalPill = '<span class="pill">— (cần verify email trước)</span>';
+        approvalPill = '<span class="pill">— (verify email first)</span>';
       }
 
       var actions = '';
@@ -545,10 +558,10 @@ async function loadUsers() {
         actions += '<button class="btn btn-primary" onclick="verifyUser(\\''+ esc(u.user_id) +'\\')">✓ Verify</button>';
         actions += '<button class="btn btn-ghost" onclick="resendVerify(\\''+ esc(u.user_id) +'\\')">↺ Verify email</button>';
       } else if (!u.approved_at) {
-        actions += '<button class="btn btn-primary" onclick="approveUser(\\''+ esc(u.user_id) +'\\', \\''+ esc(u.email) +'\\')">✓ Duyệt + gửi welcome</button>';
+        actions += '<button class="btn btn-primary" onclick="approveUser(\\''+ esc(u.user_id) +'\\', \\''+ esc(u.email) +'\\')">✓ Activate (paid) — sends license + install</button>';
       } else {
         actions += '<button class="btn btn-ghost" onclick="resendWelcome(\\''+ esc(u.user_id) +'\\')">↺ Welcome</button>';
-        actions += '<button class="btn btn-ghost" onclick="revokeUser(\\''+ esc(u.user_id) +'\\', \\''+ esc(u.email) +'\\')">⛔ Thu hồi</button>';
+        actions += '<button class="btn btn-ghost" onclick="revokeUser(\\''+ esc(u.user_id) +'\\', \\''+ esc(u.email) +'\\')">⛔ Revoke</button>';
       }
       actions += '<button class="btn btn-ghost" onclick="resetPwd(\\''+ esc(u.user_id) +'\\', \\''+ esc(u.email) +'\\')">🔑 Reset pwd</button>';
 
@@ -565,56 +578,56 @@ async function loadUsers() {
       '</tr>';
     }).join('');
   } catch (e) {
-    body.innerHTML = '<tr><td colspan="9" class="muted">Lỗi: ' + esc(e.message) + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="muted">Error: ' + esc(e.message) + '</td></tr>';
   }
 }
 
 async function verifyUser(id) {
   var r = await fetch('/api/admin/users/' + id + '/verify', { method: 'POST', credentials: 'same-origin' });
   var j = await r.json();
-  if (j.ok) { toast('ok', 'Đã verify'); loadUsers(); } else { toast('err', j.message || 'Lỗi'); }
+  if (j.ok) { toast('ok', 'Verified'); loadUsers(); } else { toast('err', j.message || 'Error'); }
 }
 async function approveUser(id, email) {
-  if (!confirm('Duyệt ' + email + '? Hệ thống sẽ gửi welcome email kèm license + lệnh cài agent.')) return;
+  if (!confirm('Activate ' + email + '? This sends the welcome email with the license key + agent install command.')) return;
   var r = await fetch('/api/admin/users/' + id + '/approve', { method: 'POST', credentials: 'same-origin' });
   var j = await r.json();
   if (j.ok) {
-    toast('ok', '✅ Đã duyệt' + (j.email_sent ? ' + welcome email đã gửi' : ' (lỗi gửi email)'));
+    toast('ok', '✅ Activated' + (j.email_sent ? ' + welcome email sent' : ' (email send failed)'));
     loadUsers();
-  } else { toast('err', j.message || 'Duyệt thất bại'); }
+  } else { toast('err', j.message || 'Activation failed'); }
 }
 async function revokeUser(id, email) {
-  if (!confirm('Thu hồi quyền của ' + email + '? User sẽ không login được nữa.')) return;
+  if (!confirm('Revoke access for ' + email + '? They will no longer be able to log in.')) return;
   var r = await fetch('/api/admin/users/' + id + '/revoke', { method: 'POST', credentials: 'same-origin' });
   var j = await r.json();
-  if (j.ok) { toast('ok', '⛔ Đã thu hồi'); loadUsers(); } else { toast('err', j.message || 'Lỗi'); }
+  if (j.ok) { toast('ok', '⛔ Revoked'); loadUsers(); } else { toast('err', j.message || 'Error'); }
 }
 async function resendVerify(id) {
   var r = await fetch('/api/admin/users/' + id + '/resend-verify', { method: 'POST', credentials: 'same-origin' });
   var j = await r.json();
-  if (j.ok) toast('ok', 'Đã gửi lại email verify' + (j.email_id ? ' (' + j.email_id.slice(0,8) + '…)' : ''));
-  else toast('err', j.message || 'Gửi thất bại');
+  if (j.ok) toast('ok', 'Verification email resent' + (j.email_id ? ' (' + j.email_id.slice(0,8) + '…)' : ''));
+  else toast('err', j.message || 'Send failed');
 }
 async function resendWelcome(id) {
   var r = await fetch('/api/admin/users/' + id + '/resend-welcome', { method: 'POST', credentials: 'same-origin' });
   var j = await r.json();
-  if (j.ok) toast('ok', 'Đã gửi lại welcome email' + (j.email_id ? ' (' + j.email_id.slice(0,8) + '…)' : ''));
-  else toast('err', j.message || 'Gửi thất bại');
+  if (j.ok) toast('ok', 'Welcome email resent' + (j.email_id ? ' (' + j.email_id.slice(0,8) + '…)' : ''));
+  else toast('err', j.message || 'Send failed');
 }
 async function resetPwd(id, email) {
-  if (!confirm('Reset password cho ' + email + '? Hệ thống sẽ tạo mật khẩu tạm.')) return;
+  if (!confirm('Reset the password for ' + email + '? A temporary password will be generated.')) return;
   var r = await fetch('/api/admin/users/' + id + '/reset-password', { method: 'POST', credentials: 'same-origin', headers: {'content-type':'application/json'}, body: '{}' });
   var j = await r.json();
   if (j.ok) {
-    prompt('Mật khẩu mới (copy ngay, không hiện lại):', j.new_password);
-  } else { toast('err', j.message || 'Reset thất bại'); }
+    prompt('New password (copy now, not shown again):', j.new_password);
+  } else { toast('err', j.message || 'Reset failed'); }
 }
 
 // ---- Create user form ----
 var _resultData = null;
 document.getElementById('createForm').addEventListener('submit', async function(e) {
   e.preventDefault();
-  var btn = document.getElementById('createBtn'); btn.disabled = true; btn.textContent = '⏳ Đang tạo…';
+  var btn = document.getElementById('createBtn'); btn.disabled = true; btn.textContent = '⏳ Creating…';
   var f = e.target;
   var body = {
     email: f.email.value,
@@ -641,10 +654,10 @@ document.getElementById('createForm').addEventListener('submit', async function(
       f.reset();
       f.auto_verify.checked = true; f.send_welcome.checked = true;
     } else {
-      toast('err', '❌ ' + (j.message || 'Tạo thất bại'));
+      toast('err', '❌ ' + (j.message || 'Create failed'));
     }
   } catch (e) { toast('err', '❌ ' + e.message); }
-  finally { btn.disabled = false; btn.textContent = 'Tạo user'; }
+  finally { btn.disabled = false; btn.textContent = 'Create user'; }
 });
 
 function copyAll() {
@@ -654,8 +667,8 @@ function copyAll() {
     'Tenant: ' + _resultData.tenant_id,
     'License: ' + _resultData.license_key,
   ];
-  if (_resultData.temp_password) lines.push('Password (tạm): ' + _resultData.temp_password);
-  navigator.clipboard.writeText(lines.join('\\n')).then(function() { toast('ok', 'Đã copy'); });
+  if (_resultData.temp_password) lines.push('Password (temporary): ' + _resultData.temp_password);
+  navigator.clipboard.writeText(lines.join('\\n')).then(function() { toast('ok', 'Copied'); });
 }
 
 // Initial load

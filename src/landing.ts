@@ -1,193 +1,322 @@
 /**
- * Public landing page at fb.autonow.vn — served when anonymous visitor hits /.
- * Authenticated users get the dashboard instead. Dark theme matching the rest of the app.
+ * Public marketing page for nextclaw (served to anonymous visitors at /).
+ * Authenticated users get the dashboard instead.
+ *
+ * Design direction "The Catch": deep ink navy + a single vivid lime "signal"
+ * accent for the one caught lead pulled out of the noise. Space Grotesk (display)
+ * + Inter (body) + Space Mono (data). Self-contained inline CSS — no Tailwind dep.
  */
+
+const BASE_URL = process.env.APP_PUBLIC_BASE_URL || 'https://nextclaw.vn';
+const INSTALL_HOST = BASE_URL.replace(/^https?:\/\//, '');
 
 export function renderLanding(): string {
   return `<!doctype html>
-<html lang="vi"><head>
+<html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fb.autonow.vn — Tìm khách hàng trong các nhóm Facebook tự động</title>
-<meta name="description" content="Crawl posts từ Facebook Groups, phân loại lead bằng AI, theo dõi pipeline sale. Self-hosted trên VPS của bạn.">
+<title>nextclaw — Catch buyers from Facebook groups, automatically</title>
+<meta name="description" content="nextclaw reads the Facebook groups you've joined 24/7, scores every post with AI, and surfaces the people ready to buy — into a clean sales pipeline. Runs on your own server.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1020; color: #e8ecf3; line-height: 1.55; }
-  a { color: #7ea7ff; text-decoration: none; }
-  a:hover { text-decoration: underline; }
+  :root{
+    --ink:#0E1430; --ink-2:#131A3B; --ink-raise:#18204A;
+    --text:#EAEDF7; --muted:#9AA3C7; --noise:#525a82;
+    --signal:#C2F24A; --signal-ink:#0E1430; --mint:#7CE3C4;
+    --line:#242C57; --line-soft:#1b224a;
+    --display:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;
+    --body:'Inter',ui-sans-serif,system-ui,sans-serif;
+    --mono:'Space Mono',ui-monospace,monospace;
+    --wrap:1120px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:var(--body);background:var(--ink);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(900px 500px at 78% -8%, rgba(194,242,74,.07), transparent 60%);}
+  a{color:inherit;text-decoration:none;}
+  ::selection{background:var(--signal);color:var(--signal-ink);}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 24px;}
 
-  header { padding: 18px 24px; border-bottom: 1px solid #1c2546; display: flex; justify-content: space-between; align-items: center; }
-  header .brand { font-weight: 700; font-size: 16px; }
-  header .brand small { display: block; font-size: 10px; color: #8a96bd; font-weight: 400; margin-top: 2px; }
-  header nav a { font-size: 13px; margin-left: 18px; color: #cad3ed; }
-  header nav .cta { background: #3b6ef0; color: #fff; padding: 8px 16px; border-radius: 6px; font-weight: 600; }
-  header nav .cta:hover { filter: brightness(1.1); text-decoration: none; }
+  /* header */
+  header{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
+    background:rgba(14,20,48,.72);border-bottom:1px solid var(--line-soft);}
+  .hbar{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em;}
+  .brand .mark{color:var(--signal);font-size:19px;line-height:1;}
+  nav.top{display:flex;align-items:center;gap:8px;}
+  nav.top a{font-size:14px;color:var(--muted);padding:8px 12px;border-radius:8px;}
+  nav.top a:hover{color:var(--text);}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-family:var(--body);font-weight:600;font-size:14px;
+    padding:11px 18px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:transform .12s ease,background .15s,border-color .15s;}
+  .btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px;}
+  .btn-go{background:var(--signal);color:var(--signal-ink);box-shadow:0 0 0 0 rgba(194,242,74,.5);}
+  .btn-go:hover{transform:translateY(-1px);box-shadow:0 8px 30px -10px rgba(194,242,74,.55);}
+  .btn-ghost{background:transparent;color:var(--text);border-color:var(--line);}
+  .btn-ghost:hover{border-color:var(--noise);background:rgba(255,255,255,.02);}
 
-  main { max-width: 1100px; margin: 0 auto; padding: 64px 24px; }
+  /* hero */
+  .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;padding:84px 0 72px;}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+    color:var(--mint);border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin-bottom:22px;}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint);}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,5vw,58px);line-height:1.04;letter-spacing:-.025em;margin:0 0 20px;}
+  h1 .hit{color:var(--signal);position:relative;white-space:nowrap;}
+  .sub{font-size:18px;color:var(--muted);max-width:520px;margin:0 0 30px;}
+  .cta-row{display:flex;gap:12px;flex-wrap:wrap;}
+  .hero .fineprint{margin-top:18px;font-family:var(--mono);font-size:12px;color:var(--noise);}
 
-  .hero { text-align: center; margin-bottom: 80px; }
-  .hero h1 { font-size: 44px; line-height: 1.15; margin: 0 0 18px; font-weight: 700; letter-spacing: -0.5px; }
-  .hero h1 span { background: linear-gradient(135deg, #7ea7ff, #b89aff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .hero p.sub { font-size: 18px; color: #a9b3d1; max-width: 640px; margin: 0 auto 32px; }
-  .hero .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .btn { padding: 13px 26px; border-radius: 8px; font-size: 15px; font-weight: 600; display: inline-block; transition: all .15s; }
-  .btn-primary { background: #3b6ef0; color: #fff; }
-  .btn-primary:hover { background: #2e5cc8; text-decoration: none; }
-  .btn-ghost { background: transparent; color: #cad3ed; border: 1px solid #2a3560; }
-  .btn-ghost:hover { background: #131a33; text-decoration: none; }
-  .hero .hint { margin-top: 16px; font-size: 12px; color: #8a96bd; }
+  /* signature: the catch */
+  .stage{position:relative;background:linear-gradient(180deg,var(--ink-2),rgba(19,26,59,.4));
+    border:1px solid var(--line);border-radius:18px;padding:20px;min-height:340px;overflow:hidden;}
+  .stage .label{font-family:var(--mono);font-size:11px;color:var(--noise);display:flex;justify-content:space-between;margin-bottom:14px;}
+  .feed{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .post{border:1px solid var(--line-soft);border-radius:11px;padding:11px 12px;background:rgba(255,255,255,.015);}
+  .post .ln{height:7px;border-radius:4px;background:var(--noise);opacity:.5;margin:5px 0;}
+  .post .ln.s{width:55%;} .post .ln.m{width:80%;}
+  .post.caught{position:relative;border-color:var(--signal);background:rgba(194,242,74,.06);
+    box-shadow:0 0 0 1px var(--signal),0 16px 50px -18px rgba(194,242,74,.5);transform:translateY(-2px);}
+  .post.caught .ln{background:var(--signal);opacity:.85;}
+  .post.caught .who{font-family:var(--body);font-weight:600;font-size:12px;color:var(--text);margin-bottom:2px;}
+  .post.caught .score{position:absolute;top:-11px;right:10px;font-family:var(--mono);font-size:11px;font-weight:700;
+    background:var(--signal);color:var(--signal-ink);padding:2px 8px;border-radius:999px;}
+  /* claw brackets on the caught post */
+  .post.caught::before,.post.caught::after{content:"";position:absolute;width:16px;height:16px;border:2px solid var(--signal);}
+  .post.caught::before{left:-7px;top:-7px;border-right:0;border-bottom:0;border-radius:4px 0 0 0;}
+  .post.caught::after{right:-7px;bottom:-7px;border-left:0;border-top:0;border-radius:0 0 4px 0;}
+  .stage .readout{margin-top:16px;display:flex;align-items:center;justify-content:space-between;
+    font-family:var(--mono);font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:13px;}
+  .stage .readout b{color:var(--signal);}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 1px var(--signal),0 16px 50px -18px rgba(194,242,74,.5);}
+    50%{box-shadow:0 0 0 1px var(--signal),0 16px 60px -10px rgba(194,242,74,.85);}}
+  .post.caught{animation:pulse 2.6s ease-in-out infinite;}
 
-  section { margin-bottom: 80px; }
-  section h2 { text-align: center; font-size: 30px; margin: 0 0 12px; font-weight: 700; }
-  section .lead { text-align: center; color: #a9b3d1; max-width: 600px; margin: 0 auto 40px; font-size: 15px; }
+  /* sections */
+  section{padding:64px 0;border-top:1px solid var(--line-soft);}
+  .sec-head{max-width:640px;margin:0 0 40px;}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mint);margin:0 0 10px;}
+  h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,38px);letter-spacing:-.02em;margin:0 0 12px;}
+  .sec-head p{color:var(--muted);font-size:16px;margin:0;}
 
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
-  @media (max-width: 800px) { .grid-3, .grid-4 { grid-template-columns: 1fr; } .hero h1 { font-size: 32px; } }
+  /* flow (real funnel, not decorative numbers) */
+  .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .step{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:24px;position:relative;}
+  .step .tag{font-family:var(--mono);font-size:12px;color:var(--signal);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .step .tag .i{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);display:grid;place-items:center;color:var(--text);}
+  .step h3{font-family:var(--display);font-size:18px;margin:0 0 8px;font-weight:600;}
+  .step p{color:var(--muted);font-size:14px;margin:0;}
+  .code{display:block;font-family:var(--mono);font-size:12px;color:var(--mint);background:#0a0f26;border:1px solid var(--line);
+    border-radius:9px;padding:11px 12px;margin-top:14px;overflow-x:auto;white-space:nowrap;}
 
-  .card { background: #131a33; border: 1px solid #222a4a; border-radius: 12px; padding: 24px; }
-  .card .icon { width: 36px; height: 36px; background: #1c2546; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 18px; }
-  .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
-  .card p { margin: 0; color: #a9b3d1; font-size: 13px; }
+  /* features */
+  .feats{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+  .feat{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;gap:16px;}
+  .feat .g{flex:0 0 auto;width:40px;height:40px;border-radius:11px;background:rgba(194,242,74,.1);border:1px solid var(--line);
+    display:grid;place-items:center;color:var(--signal);font-family:var(--mono);font-weight:700;font-size:15px;}
+  .feat h3{font-family:var(--display);font-size:16px;margin:0 0 6px;font-weight:600;}
+  .feat p{color:var(--muted);font-size:14px;margin:0;}
 
-  .steps { counter-reset: step; }
-  .step-card { position: relative; }
-  .step-card .num { position: absolute; top: -14px; left: 24px; background: #3b6ef0; color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
-  .step-card .code { display: block; background: #0a0f24; border: 1px solid #1c2546; border-radius: 6px; padding: 10px 12px; font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: #9eecbe; margin-top: 12px; overflow-x: auto; white-space: nowrap; }
+  /* pricing */
+  .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start;}
+  .tier{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:26px;}
+  .tier.feature{border-color:var(--signal);box-shadow:0 24px 70px -34px rgba(194,242,74,.5);}
+  .tier .name{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .tier .feature-flag{float:right;font-family:var(--mono);font-size:11px;color:var(--signal-ink);background:var(--signal);padding:2px 8px;border-radius:999px;}
+  .tier .price{font-family:var(--display);font-size:38px;font-weight:700;margin:14px 0 2px;letter-spacing:-.02em;}
+  .tier .price span{font-family:var(--mono);font-size:13px;font-weight:400;color:var(--noise);}
+  .tier ul{list-style:none;padding:0;margin:18px 0 22px;}
+  .tier li{font-size:14px;color:var(--muted);padding:7px 0 7px 24px;position:relative;border-top:1px solid var(--line-soft);}
+  .tier li:first-child{border-top:0;}
+  .tier li::before{content:"";position:absolute;left:2px;top:13px;width:9px;height:9px;border-radius:50%;
+    background:rgba(194,242,74,.18);box-shadow:inset 0 0 0 2px var(--signal);}
+  .tier .btn{width:100%;justify-content:center;}
+  .pay-note{font-family:var(--mono);font-size:12px;color:var(--noise);text-align:center;margin-top:22px;}
 
-  .faq { max-width: 720px; margin: 0 auto; }
-  details { background: #131a33; border: 1px solid #222a4a; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; }
-  details summary { cursor: pointer; font-weight: 600; font-size: 14px; }
-  details[open] summary { margin-bottom: 8px; }
-  details p { margin: 0; color: #a9b3d1; font-size: 13px; }
+  /* faq */
+  .faq{max-width:760px;}
+  details{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:10px;background:var(--ink-2);}
+  details[open]{border-color:var(--noise);}
+  summary{cursor:pointer;font-family:var(--display);font-weight:600;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;}
+  summary::-webkit-details-marker{display:none;}
+  summary::after{content:"+";font-family:var(--mono);color:var(--signal);font-size:18px;}
+  details[open] summary::after{content:"\\2212";}
+  details p{color:var(--muted);font-size:14px;margin:12px 0 0;}
 
-  .cta-bottom { text-align: center; background: linear-gradient(135deg, #131a33, #1a2240); padding: 50px 24px; border-radius: 16px; border: 1px solid #2a3560; }
-  .cta-bottom h2 { margin-bottom: 12px; }
-  .cta-bottom p { color: #a9b3d1; margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; }
+  /* bottom cta */
+  .endcta{text-align:center;background:linear-gradient(180deg,var(--ink-2),rgba(24,32,74,.5));
+    border:1px solid var(--line);border-radius:22px;padding:56px 28px;}
+  .endcta h2{margin-bottom:10px;}
+  .endcta p{color:var(--muted);max-width:520px;margin:0 auto 26px;}
 
-  footer { border-top: 1px solid #1c2546; padding: 24px; text-align: center; font-size: 12px; color: #8a96bd; }
+  footer{border-top:1px solid var(--line-soft);padding:30px 0;color:var(--noise);font-family:var(--mono);font-size:12px;}
+  .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  footer a:hover{color:var(--text);}
+
+  @media (max-width:880px){
+    .hero{grid-template-columns:1fr;padding:56px 0 48px;}
+    .stage{order:2;}
+    .flow,.feats,.tiers{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion:reduce){.post.caught{animation:none;}.btn{transition:none;}}
 </style>
 </head><body>
 
-<header>
-  <div class="brand">
-    fb.autonow.vn
-    <small>FB Group Intelligence cho sale team</small>
-  </div>
-  <nav>
-    <a href="/auth/login">Đăng nhập</a>
-    <a class="cta" href="/auth/signup">Dùng thử miễn phí</a>
+<header><div class="wrap hbar">
+  <a class="brand" href="/"><span class="mark">&#9670;</span>nextclaw</a>
+  <nav class="top">
+    <a href="#how">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/auth/login">Log in</a>
+    <a class="btn btn-go" href="/auth/signup">Get started</a>
   </nav>
-</header>
+</div></header>
 
-<main>
+<main class="wrap">
 
-<div class="hero">
-  <h1>Tìm khách hàng tiềm năng<br><span>trong các nhóm Facebook</span> — tự động</h1>
-  <p class="sub">
-    Hệ thống tự crawl bài viết từ các Facebook Groups bạn đã tham gia, dùng AI phân loại
-    intent (hỏi giá, cần tư vấn, khiếu nại…), và quản lý pipeline sale 12 stage.
-    Tất cả chạy trên VPS riêng — data của bạn không bao giờ rời khỏi server bạn kiểm soát.
-  </p>
-  <div class="cta-row">
-    <a class="btn btn-primary" href="/auth/signup">Đăng ký dùng thử →</a>
-    <a class="btn btn-ghost" href="/auth/login">Đã có tài khoản</a>
-  </div>
-  <div class="hint">Miễn phí trong giai đoạn beta · Không cần thẻ tín dụng</div>
-</div>
-
-<section>
-  <h2>Hoạt động như thế nào?</h2>
-  <p class="lead">3 bước để bắt đầu — toàn bộ setup mất khoảng 10 phút.</p>
-  <div class="grid-3 steps">
-    <div class="card step-card">
-      <div class="num">1</div>
-      <div class="icon">📝</div>
-      <h3>Đăng ký tài khoản</h3>
-      <p>Tạo workspace bằng email + mật khẩu. Hệ thống cấp cho bạn một <code>license_key</code> để kết nối agent về cloud.</p>
+  <div class="hero">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>Lead generation for Facebook groups</span>
+      <h1>Your next customer is already posting.<br><span class="hit">We catch them.</span></h1>
+      <p class="sub">nextclaw watches the Facebook groups you've joined around the clock, scores every post with AI, and pulls the people who are ready to buy into a clean sales pipeline — so you stop scrolling and start closing.</p>
+      <div class="cta-row">
+        <a class="btn btn-go" href="/auth/signup">Start catching leads &rarr;</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <div class="fineprint">// runs on your own server &middot; your Facebook session never leaves it</div>
     </div>
-    <div class="card step-card">
-      <div class="num">2</div>
-      <div class="icon">🖥️</div>
-      <h3>Cài agent trên VPS của bạn</h3>
-      <p>Chạy 1 lệnh duy nhất. Agent sẽ tự động cài Chrome, Playwright và kết nối về fb.autonow.vn.</p>
-      <code class="code">curl -fsSL https://fb.autonow.vn/install.sh \\<br>&nbsp;&nbsp;| LICENSE_KEY=lk_xxx bash</code>
-    </div>
-    <div class="card step-card">
-      <div class="num">3</div>
-      <div class="icon">🎯</div>
-      <h3>Login FB 1 lần — xong</h3>
-      <p>Mở noVNC từ dashboard, login Facebook 1 lần duy nhất. Hệ thống tự crawl 24/7, AI phân loại lead, bạn quản lý pipeline qua giao diện web.</p>
+
+    <div class="stage" aria-hidden="true">
+      <div class="label"><span>group feed</span><span>scanning&hellip;</span></div>
+      <div class="feed">
+        <div class="post"><div class="ln m"></div><div class="ln s"></div></div>
+        <div class="post"><div class="ln s"></div><div class="ln m"></div></div>
+        <div class="post caught">
+          <span class="score">94% buyer</span>
+          <div class="who">Mai N. &middot; asking for a quote</div>
+          <div class="ln m"></div><div class="ln s"></div>
+        </div>
+        <div class="post"><div class="ln m"></div><div class="ln s"></div></div>
+        <div class="post"><div class="ln s"></div><div class="ln m"></div></div>
+        <div class="post"><div class="ln m"></div><div class="ln s"></div></div>
+      </div>
+      <div class="readout"><span>1,000s of posts</span><span><b>1 caught</b> &rarr; pipeline</span></div>
     </div>
   </div>
-</section>
 
-<section>
-  <h2>Tính năng chính</h2>
-  <p class="lead">Mọi thứ bạn cần để biến Facebook Groups thành kênh tìm khách hàng có thể đo lường.</p>
-  <div class="grid-4">
-    <div class="card">
-      <div class="icon">🔍</div>
-      <h3>Auto-crawl 24/7</h3>
-      <p>Quét posts + comments mới mỗi 2 giờ từ tất cả groups bạn enable. Watermark-based — không bao giờ miss data.</p>
+  <section id="how">
+    <div class="sec-head">
+      <p class="kicker">Connect once, then it runs</p>
+      <h2>From noisy feeds to a working pipeline</h2>
+      <p>Three steps, about ten minutes. After that nextclaw does the watching for you.</p>
     </div>
-    <div class="card">
-      <div class="icon">🤖</div>
-      <h3>AI phân loại lead</h3>
-      <p>Gemini 2.5 Flash đọc tiếng Việt, phân loại 7 intent: hỏi giá, cần tư vấn, khiếu nại, khoe sản phẩm, seeding, spam, khác.</p>
+    <div class="flow">
+      <div class="step">
+        <div class="tag"><span class="i">&#9670;</span>Connect</div>
+        <h3>Create your workspace</h3>
+        <p>Sign up and get a license key. It links the scraper agent on your server back to nextclaw.</p>
+      </div>
+      <div class="step">
+        <div class="tag"><span class="i">&#8623;</span>Install</div>
+        <h3>One command on your server</h3>
+        <p>The agent installs everything it needs and logs into Facebook once, through a private browser only you can see.</p>
+        <code class="code">curl -fsSL ${INSTALL_HOST}/install.sh \\<br>&nbsp;&nbsp;| LICENSE_KEY=lk_&hellip; bash</code>
+      </div>
+      <div class="step">
+        <div class="tag"><span class="i">&#9651;</span>Catch</div>
+        <h3>Buyers land in your pipeline</h3>
+        <p>nextclaw scores new posts 24/7, surfaces real buyers, pings your Telegram, and even drafts a reply for you to approve.</p>
+      </div>
     </div>
-    <div class="card">
-      <div class="icon">📊</div>
-      <h3>Pipeline 12 stage</h3>
-      <p>Theo dõi từng lead qua các stage: mới → liên hệ → báo giá → gửi mẫu → top-up 1 → first order → top-up 2 → ship → closed.</p>
-    </div>
-    <div class="card">
-      <div class="icon">🔒</div>
-      <h3>Self-hosted, data riêng</h3>
-      <p>Agent chạy trên VPS của bạn. Cookie Facebook + post raw không bao giờ rời khỏi server bạn kiểm soát.</p>
-    </div>
-  </div>
-</section>
+  </section>
 
-<section>
-  <h2>Câu hỏi thường gặp</h2>
-  <div class="faq">
-    <details>
-      <summary>Tôi có cần VPS không? Cấu hình bao nhiêu?</summary>
-      <p>Có. Khuyến nghị tối thiểu 4 CPU / 8GB RAM (vì cần Chrome headed). Ubuntu 22.04+. Chi phí ~$10-20/tháng tại các nhà cung cấp như Hetzner, Vultr, DigitalOcean.</p>
-    </details>
-    <details>
-      <summary>Facebook có khóa account không?</summary>
-      <p>Có rủi ro nếu dùng account chính. Khuyến nghị dùng account phụ đã tồn tại ≥3 tháng. Hệ thống đã built-in các best practice: persistent profile, mbasic-first, delay 10-25s giữa request, budget 3000 request/ngày.</p>
-    </details>
-    <details>
-      <summary>AI phân loại có chính xác không?</summary>
-      <p>Trên content tiếng Việt, Gemini 2.5 Flash đạt 90-95% confidence với các intent rõ ràng. Bạn có thể override classification thủ công trên dashboard, và hệ thống cache result để không gọi API lặp lại.</p>
-    </details>
-    <details>
-      <summary>Chi phí AI API thế nào?</summary>
-      <p>Bạn dùng Gemini API key của riêng mình (free tier 1500 request/ngày là đủ cho hầu hết use case). Nếu vượt: ước tính ~$1.50/tháng cho 1000 post/ngày được phân loại.</p>
-    </details>
-    <details>
-      <summary>Đang beta — nghĩa là gì?</summary>
-      <p>Hệ thống đang chạy production cho 1 user (tác giả). Đang mở dần cho beta tester. Agent installer Phase B sắp release — đăng ký để được ưu tiên invite.</p>
-    </details>
-  </div>
-</section>
+  <section>
+    <div class="sec-head">
+      <p class="kicker">What you get</p>
+      <h2>Everything to turn groups into customers</h2>
+    </div>
+    <div class="feats">
+      <div class="feat"><div class="g">24/7</div><div><h3>Always-on watching</h3><p>New posts and comments are pulled from every group you enable, on a schedule — nothing slips past while you sleep.</p></div></div>
+      <div class="feat"><div class="g">AI</div><div><h3>Buyer scoring</h3><p>Each post is read and scored for buying intent, with a confidence percentage and a one-line reason — so you act on the right people first.</p></div></div>
+      <div class="feat"><div class="g">&#8623;</div><div><h3>A real sales pipeline</h3><p>Every caught lead moves through stages from new to closed, with notes and history — built for following up, not just collecting.</p></div></div>
+      <div class="feat"><div class="g">&#128274;</div><div><h3>Yours, on your server</h3><p>The agent runs on a server you control. Your Facebook session and the posts it reads stay with you — never on ours.</p></div></div>
+    </div>
+  </section>
 
-<section>
-  <div class="cta-bottom">
-    <h2>Sẵn sàng tìm lead trong FB Groups?</h2>
-    <p>Đăng ký bây giờ để giữ chỗ. Khi agent installer sẵn sàng, bạn sẽ nhận email kèm lệnh cài đặt.</p>
-    <a class="btn btn-primary" href="/auth/signup">Tạo tài khoản miễn phí →</a>
-  </div>
-</section>
+  <section id="pricing">
+    <div class="sec-head">
+      <p class="kicker">Pricing</p>
+      <h2>Simple plans, no surprises</h2>
+      <p>Pick a plan and sign up. We'll confirm your payment and switch your account on by hand — usually within a few hours.</p>
+    </div>
+    <div class="tiers">
+      <div class="tier">
+        <div class="name">Starter</div>
+        <div class="price">$19<span>/mo</span></div>
+        <ul>
+          <li>Up to 20 groups</li>
+          <li>AI buyer scoring</li>
+          <li>Sales pipeline + Telegram alerts</li>
+          <li>Email support</li>
+        </ul>
+        <a class="btn btn-ghost" href="/auth/signup">Choose Starter</a>
+      </div>
+      <div class="tier feature">
+        <span class="feature-flag">Most popular</span>
+        <div class="name">Pro</div>
+        <div class="price">$49<span>/mo</span></div>
+        <ul>
+          <li>Up to 100 groups</li>
+          <li>Everything in Starter</li>
+          <li>AI reply drafts for approval</li>
+          <li>Custom lead rules &amp; topics</li>
+          <li>Priority support</li>
+        </ul>
+        <a class="btn btn-go" href="/auth/signup">Choose Pro</a>
+      </div>
+      <div class="tier">
+        <div class="name">Scale</div>
+        <div class="price">Custom</div>
+        <ul>
+          <li>Unlimited groups</li>
+          <li>Multiple Facebook accounts</li>
+          <li>Your own AI key &amp; quotas</li>
+          <li>Hands-on onboarding</li>
+        </ul>
+        <a class="btn btn-ghost" href="/auth/signup">Talk to us</a>
+      </div>
+    </div>
+    <p class="pay-note">// you bring the server (~$5&ndash;10/mo) &middot; the agent runs there, not on ours</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="kicker">Questions</p>
+      <h2>Good to know</h2>
+    </div>
+    <div class="faq">
+      <details><summary>Do I need my own server?</summary><p>Yes — a small VPS (about $5&ndash;10/month at providers like Hetzner, Vultr, or DigitalOcean). The scraper agent runs there so your Facebook session stays under your control. One command installs everything.</p></details>
+      <details><summary>Will Facebook ban my account?</summary><p>There's always some risk with automation. We recommend a secondary account that's at least a few months old. nextclaw is conservative by default: a persistent browser profile, human-like delays between requests, and a daily request budget.</p></details>
+      <details><summary>How accurate is the AI scoring?</summary><p>On clear posts it's strong, and every lead comes with a confidence score and a short reason so you can judge it yourself. You can correct any classification, and results are cached so the same post is never re-scored.</p></details>
+      <details><summary>What does the AI cost?</summary><p>You can use your own AI key, whose free tier covers most use. Beyond that it's roughly a dollar or two a month for a thousand posts a day — small enough to ignore.</p></details>
+      <details><summary>How do I get started?</summary><p>Sign up, pick a plan, and complete payment. We switch your account on, email you the one-line install command, and you're catching leads the same day.</p></details>
+    </div>
+  </section>
+
+  <section>
+    <div class="endcta">
+      <h2>The buyers are already there.</h2>
+      <p>Stop scrolling through group feeds hoping to spot them. Let nextclaw catch them for you.</p>
+      <a class="btn btn-go" href="/auth/signup">Start catching leads &rarr;</a>
+    </div>
+  </section>
 
 </main>
 
-<footer>
-  © 2026 autonow.vn · <a href="mailto:support@autonow.vn">support@autonow.vn</a>
-</footer>
+<footer><div class="wrap foot">
+  <span>&copy; 2026 nextclaw</span>
+  <span><a href="/auth/login">Log in</a> &middot; <a href="/auth/signup">Get started</a> &middot; <a href="mailto:support@${INSTALL_HOST}">support@${INSTALL_HOST}</a></span>
+</div></footer>
 
 </body></html>`;
 }

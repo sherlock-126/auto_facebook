@@ -78,7 +78,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
           req.log.warn({ tid, lockedHostname, incomingHostname }, 'heartbeat rejected: hostname_locked');
           return reply.status(403).send({
             error:   'hostname_locked',
-            message: 'License key đã đăng ký với máy khác. Vào dashboard → Setup → Kết nối → "Reset VPS lock", hoặc liên hệ admin.',
+            message: 'This license key is already locked to another machine. Go to dashboard → Setup → Connection → "Reset VPS lock", or contact support.',
           });
         }
       }

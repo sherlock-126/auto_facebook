@@ -33,7 +33,7 @@ export async function registerAgentDashboardRoutes(app: FastifyInstance): Promis
       [tid]
     );
     if (!rows[0]) {
-      return reply.status(404).send({ error: 'no_agent', message: 'Chưa cài agent trên VPS' });
+      return reply.status(404).send({ error: 'no_agent', message: 'Agent not installed on your VPS' });
     }
     const payload = req.body?.nav_url ? { nav_url: req.body.nav_url.slice(0, 500) } : null;
     await pool.query(
