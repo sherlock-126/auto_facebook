@@ -22,7 +22,19 @@ if [ -z "$HAS_TENANTS" ]; then
   done
   echo "[entrypoint] migrations applied"
 else
-  echo "[entrypoint] database already initialized — skipping migrations"
+  echo "[entrypoint] database already initialized — skipping base migrations"
 fi
+
+# Patch migrations (numbered >= 023) are applied on EVERY boot. They MUST be
+# idempotent (IF NOT EXISTS / IF EXISTS guards) so re-running is a harmless no-op.
+# This auto-applies new schema changes to already-initialized DBs without a full
+# migration tracker (fixes the "new migration never reaches prod" gap).
+for f in sql/*.sql; do
+  n="$(basename "$f" | sed -E 's/^0*([0-9]+).*/\1/')"
+  if [ "${n:-0}" -ge 23 ] 2>/dev/null; then
+    echo "[entrypoint] patch $f"
+    $PSQL -v ON_ERROR_STOP=1 -f "$f"
+  fi
+done
 
 exec "$@"

@@ -1160,7 +1160,8 @@ app.get('/install.sh', async (_req, reply) => {
       `#!/usr/bin/env bash\necho "ERROR: installer not built. Contact admin."\nexit 1\n`
     );
   }
-  reply.type('text/plain').send(script.replaceAll('__CLOUD_BASE_URL__', baseUrl));
+  // no-store so Cloudflare/proxies never serve a stale installer after a deploy.
+  reply.header('Cache-Control', 'no-store').type('text/plain').send(script.replaceAll('__CLOUD_BASE_URL__', baseUrl));
 });
 
 // ----- Facebook launcher bridge page -----
