@@ -117,7 +117,9 @@ async function pageEvaluateWithRetry<T, A>(page: Page, fn: (a: A) => Promise<T>,
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await page.evaluate(fn, arg);
+      // Cast: Playwright's PageFunction generic (Unboxed<A>) doesn't unify with our
+      // plain (a: A) signature; the call is correct at runtime (serialized + arg passed).
+      return await page.evaluate(fn as any, arg as any);
     } catch (e) {
       lastErr = e;
       const msg = String(e);
