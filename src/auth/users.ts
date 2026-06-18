@@ -57,6 +57,7 @@ export async function createUserAndTenant(args: {
   email: string;
   password: string;
   tenant_name?: string;
+  plan?: string;
 }): Promise<CreatedUser> {
   const email = args.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Invalid email');
@@ -74,11 +75,13 @@ export async function createUserAndTenant(args: {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const ALLOWED_PLANS = new Set(['free', 'starter', 'pro', 'scale', 'enterprise']);
+    const plan = ALLOWED_PLANS.has(String(args.plan)) ? String(args.plan) : 'free';
     await client.query(
       `INSERT INTO tenants (tenant_id, name, owner_email, plan, license_key, config)
-       VALUES ($1, $2, $3, 'free', $4,
+       VALUES ($1, $2, $3, $5, $4,
                '{"lead_intents":["request_quote","question","complaint"],"classifier_enabled":true,"classifier_model":"gemini-2.5-flash"}'::jsonb)`,
-      [tenantId, tenantName, email, licenseKey]
+      [tenantId, tenantName, email, licenseKey, plan]
     );
     await client.query(
       `INSERT INTO users (user_id, tenant_id, email, password_hash, role)

@@ -999,7 +999,7 @@ async function registerTelegramWebhookForTenant(tenantId: string, botToken: stri
   const { randomBytes } = await import('node:crypto');
   const { setWebhook }  = await import('./telegram/api.js');
   const secret = randomBytes(24).toString('hex'); // 48 chars
-  const base = process.env.APP_PUBLIC_BASE_URL ?? 'https://fb.autonow.vn';
+  const base = process.env.APP_PUBLIC_BASE_URL ?? 'https://nextclaw.vn';
   const url  = `${base.replace(/\/$/, '')}/api/telegram/wh/${secret}`;
   const r = await setWebhook(botToken, url, secret);
   if (!r.ok) {
@@ -1151,7 +1151,7 @@ app.get('/', async (req, reply) => {
 // templated, so multiple cloud deployments can serve the same tarball.
 const INSTALL_SH_PATH = resolvePath(process.cwd(), 'agent/install.sh');
 app.get('/install.sh', async (_req, reply) => {
-  const baseUrl = process.env.APP_PUBLIC_BASE_URL ?? 'https://fb.autonow.vn';
+  const baseUrl = process.env.APP_PUBLIC_BASE_URL ?? 'https://nextclaw.vn';
   let script: string;
   try {
     script = readFileSync(INSTALL_SH_PATH, 'utf8');
@@ -4095,13 +4095,25 @@ async function start(): Promise<void> {
   // and run as the configured DEFAULT_TENANT_ID (Phase A single-tenant).
   // Customer agents authenticate via Authorization: Bearer <license_key> on /api/agent/*.
   const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN ?? '';
-  const INTERNAL_TENANT = process.env.DEFAULT_TENANT_ID ?? 'tuantran';
+  const INTERNAL_TENANT = process.env.DEFAULT_TENANT_ID ?? 'default';
   // Public paths (no auth needed). `/` is special: serves landing for anon, dashboard for authed.
   const PUBLIC_PATHS = new Set(['/', '/install.sh', '/favicon.ico', '/health', '/admin']);
   // Liveness probe for docker healthcheck / nginx / CI deploy wait. No auth, no DB.
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
+    // Cloud-only deploy has no browser — the local-scrape endpoints (which launch
+    // Chrome) must not be hit here; scraping happens on the customer's agent VPS.
+    if (process.env.CLOUD_ONLY === '1' && /^\/api\/(login|discover|run)\b/.test(path)) {
+      return reply.status(409).send({ error: 'cloud_only', message: 'This runs on your agent VPS, not the cloud.' });
+    }
+    // On the admin subdomain, don't surface the user-facing auth pages — the admin
+    // console has its own login at '/'. (POST endpoints like /auth/admin-login,
+    // /auth/logout still work.)
+    if (req.hostname === ADMIN_HOST && req.method === 'GET'
+        && /^\/auth\/(login|signup|forgot|reset|verify)\b/.test(path)) {
+      return reply.redirect('/');
+    }
     if (path.startsWith('/auth/')) return;
     if (path.startsWith('/agent/')) return; // static tarball — fully public
     if (path.startsWith('/public/')) return; // compiled CSS/assets — fully public

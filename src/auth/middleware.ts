@@ -32,6 +32,10 @@ export function isAdminEmail(email: string | undefined | null): boolean {
 
 /** Hard gate: 403 if logged in but not in ADMIN_EMAILS. Must run after requireAuth or loadSession. */
 export async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  // The admin surface (panel + /api/admin/*) lives ONLY on the admin subdomain —
+  // never expose it on the customer-facing host, even to an admin session.
+  const adminHost = process.env.ADMIN_HOST || 'admin.nextclaw.vn';
+  if (req.hostname !== adminHost) return reply.status(404).send({ error: 'not_found' });
   if (!req.user_id) return reply.status(401).send({ error: 'unauthorized' });
   if (!req.is_admin) return reply.status(403).send({ error: 'forbidden', message: 'Admin access required' });
 }

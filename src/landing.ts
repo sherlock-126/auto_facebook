@@ -259,7 +259,7 @@ export function renderLanding(): string {
           <li>Sales pipeline + Telegram alerts</li>
           <li>Email support</li>
         </ul>
-        <a class="btn btn-ghost" href="/auth/signup">Choose Starter</a>
+        <a class="btn btn-ghost" href="/auth/signup?plan=starter">Choose Starter</a>
       </div>
       <div class="tier feature">
         <span class="feature-flag">Most popular</span>
@@ -272,7 +272,7 @@ export function renderLanding(): string {
           <li>Custom lead rules &amp; topics</li>
           <li>Priority support</li>
         </ul>
-        <a class="btn btn-go" href="/auth/signup">Choose Pro</a>
+        <a class="btn btn-go" href="/auth/signup?plan=pro">Choose Pro</a>
       </div>
       <div class="tier">
         <div class="name">Scale</div>
@@ -283,7 +283,7 @@ export function renderLanding(): string {
           <li>Your own AI key &amp; quotas</li>
           <li>Hands-on onboarding</li>
         </ul>
-        <a class="btn btn-ghost" href="/auth/signup">Talk to us</a>
+        <a class="btn btn-ghost" href="/auth/signup?plan=scale">Talk to us</a>
       </div>
     </div>
     <p class="pay-note">// you bring the server (~$5&ndash;10/mo) &middot; the agent runs there, not on ours</p>

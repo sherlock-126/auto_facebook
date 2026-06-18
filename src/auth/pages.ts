@@ -83,6 +83,7 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
   app.get('/auth/signup', async (_req, reply) => {
     reply.type('text/html').send(shell('Create your account', `
       <div id="msg" class="msg"></div>
+      <div class="hint" id="planHint" style="margin:0 0 12px;color:var(--mint);"></div>
       <form id="f">
         <label>Workspace name (optional)</label>
         <input name="tenant_name" placeholder="e.g. ACME Corp" maxlength="80">
@@ -96,15 +97,17 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
       </form>
       <div class="alt">Already have an account? <a href="/auth/login">Log in</a></div>
       <script>
+      (function(){ var p = getQS('plan'); if (p) { var el = document.getElementById('planHint'); if (el) el.textContent = 'Selected plan: ' + p; } })();
       document.getElementById('f').addEventListener('submit', async (e) => {
         e.preventDefault();
         var btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = 'Working…';
         var data = Object.fromEntries(new FormData(e.target));
+        data.plan = getQS('plan') || undefined;
         try {
           var r = await fetch('/auth/signup', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(data) });
           var j = await r.json();
           if (j.ok) {
-            showMsg('ok', 'Verification email sent to ' + data.email + '. Once you verify, your account joins the activation queue — we\\'ll email you when it\\'s switched on.');
+            showMsg('ok', 'Verification email sent to ' + data.email + '. After you verify, we\\'ll confirm your plan and payment, then activate your account and email you. Questions or ready to pay? support@nextclaw.vn');
             btn.textContent = 'Email sent';
           } else {
             showMsg('err', (j.message || j.error || 'Something went wrong'));
@@ -136,7 +139,7 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
       (function(){
         var m = getQS('msg');
         if (m === 'verified')              showMsg('ok',   'Email verified — log in to continue.');
-        else if (m === 'verified_pending') showMsg('info', 'Email verified. Your account is awaiting activation — we\\'ll email you once it\\'s switched on, then you can log in.');
+        else if (m === 'verified_pending') showMsg('info', 'Email verified! We\\'ll activate your account once your payment is confirmed, then email you so you can log in. Ready to pay or have questions? support@nextclaw.vn');
         else if (m === 'approved')         showMsg('ok',   'Your account is active! Log in to continue.');
         else if (m === 'reset_ok')         showMsg('ok',   'Your password has been reset.');
         else if (m === 'used')             showMsg('err',  'This link has already been used.');
@@ -160,7 +163,7 @@ export async function registerAuthPages(app: FastifyInstance): Promise<void> {
                 showMsg('ok', 'Verification email resent.');
               };
             } else if (j.error === 'pending_approval') {
-              showMsg('info', 'Your account is awaiting activation. We\\'ll email you once it\\'s switched on.');
+              showMsg('info', 'Your account is awaiting activation. We\\'ll switch it on once your payment is confirmed. Questions? support@nextclaw.vn');
             } else {
               showMsg('err', (j.message || 'Login failed'));
             }

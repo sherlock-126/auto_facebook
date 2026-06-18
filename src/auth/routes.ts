@@ -15,15 +15,15 @@ const RL = { rateLimit: { max: 5, timeWindow: '1 minute' } } as const;
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   // ---- SIGNUP ----
-  app.post<{ Body: { email: string; password: string; tenant_name?: string } }>(
+  app.post<{ Body: { email: string; password: string; tenant_name?: string; plan?: string } }>(
     '/auth/signup',
     { config: RL as any },
     async (req, reply) => {
-      const { email, password, tenant_name } = req.body ?? {} as any;
+      const { email, password, tenant_name, plan } = req.body ?? {} as any;
       if (!email || !password) return reply.status(400).send({ error: 'missing_fields' });
       try {
         validatePassword(password);
-        const user = await createUserAndTenant({ email, password, tenant_name });
+        const user = await createUserAndTenant({ email, password, tenant_name, plan });
 
         const token = await issueToken(user.user_id, 'verify_email');
         const tpl = verifyEmailTemplate({ email: user.email, token });
@@ -103,6 +103,13 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.redirect(`/auth/login?msg=${result.reason ?? 'invalid_token'}`);
     }
     await markEmailVerified(result.user_id);
+    // Admins skip the activation wait → send them to the admin console; customers
+    // land on the user login with the "awaiting activation" notice.
+    const { rows } = await pool.query('SELECT email FROM users WHERE user_id = $1', [result.user_id]);
+    if (rows[0] && isAdminEmail(rows[0].email)) {
+      const ADMIN_HOST = process.env.ADMIN_HOST || 'admin.nextclaw.vn';
+      return reply.redirect('https://' + ADMIN_HOST + '/');
+    }
     return reply.redirect('/auth/login?msg=verified_pending');
   });
 

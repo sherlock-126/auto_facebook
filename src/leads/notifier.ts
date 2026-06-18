@@ -11,7 +11,7 @@
 import { pool } from '../db.js';
 import { getTenantConfig, STAGE_LABELS, INTENT_LABELS, type Intent } from './pipeline.js';
 
-const APP_BASE_URL = process.env.APP_PUBLIC_BASE_URL ?? 'https://fb.autonow.vn';
+const APP_BASE_URL = process.env.APP_PUBLIC_BASE_URL ?? 'https://nextclaw.vn';
 
 interface TelegramInlineKeyboardButton {
   text: string;
