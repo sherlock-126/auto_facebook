@@ -7,7 +7,7 @@ import { pool } from '../db.js';
 import { signSession, issueToken, consumeToken } from './tokens.js';
 import { hashPassword, verifyPassword, validatePassword } from './passwords.js';
 import { createUserAndTenant, findUserByEmail, markEmailVerified, updatePassword, recordLogin } from './users.js';
-import { setSessionCookie, clearSessionCookie, requireAuth } from './middleware.js';
+import { setSessionCookie, clearSessionCookie, requireAuth, isAdminEmail } from './middleware.js';
 import { sendEmail } from '../email/resend-client.js';
 import { verifyEmailTemplate, passwordResetTemplate } from '../email/templates.js';
 
@@ -60,6 +60,28 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       setSessionCookie(reply, jwt);
       await recordLogin(u.user_id);
       return { ok: true, tenant_id: u.tenant_id, email: u.email, role: u.role };
+    }
+  );
+
+  // ---- ADMIN LOGIN (separate page on admin.nextclaw.vn) ----
+  // Admins/staff skip the customer activation (approved_at) gate. Only emails in
+  // ADMIN_EMAILS may use this; a verified email + correct password is enough.
+  app.post<{ Body: { email: string; password: string } }>(
+    '/auth/admin-login',
+    { config: RL as any },
+    async (req, reply) => {
+      const { email, password } = req.body ?? {} as any;
+      if (!email || !password) return reply.status(400).send({ error: 'missing_fields' });
+      if (!isAdminEmail(email)) return reply.status(403).send({ error: 'not_admin', message: 'Not an administrator account' });
+      const u = await findUserByEmail(email);
+      if (!u) return reply.status(401).send({ error: 'invalid_credentials', message: 'Wrong email or password' });
+      const ok = await verifyPassword(password, u.password_hash);
+      if (!ok) return reply.status(401).send({ error: 'invalid_credentials', message: 'Wrong email or password' });
+      if (!u.email_verified_at) return reply.status(403).send({ error: 'email_not_verified', message: 'Please verify your email first' });
+      const jwt = await signSession({ sub: u.user_id, tid: u.tenant_id, role: u.role, email: u.email });
+      setSessionCookie(reply, jwt);
+      await recordLogin(u.user_id);
+      return { ok: true };
     }
   );
 

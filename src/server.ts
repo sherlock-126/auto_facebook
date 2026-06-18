@@ -21,7 +21,7 @@ import { registerAuthPlugins, loadSession, isAdminEmail } from './auth/middlewar
 import { registerAuthRoutes } from './auth/routes.js';
 import { registerAuthPages } from './auth/pages.js';
 import { renderLanding } from './landing.js';
-import { registerAdmin } from './admin.js';
+import { registerAdmin, renderAdmin, renderAdminLogin } from './admin.js';
 import { registerAgentRoutes } from './agent/routes.js';
 import { registerAgentUploadRoutes } from './agent/upload.js';
 import { registerAgentDashboardRoutes } from './agent/dashboard.js';
@@ -1129,14 +1129,18 @@ app.get('/api/dashboard/stats', async (req) => {
   };
 });
 
-// ----- root HTML — landing for anon, dashboard for authed -----
+// ----- root HTML — host-aware -----
+// admin.nextclaw.vn → admin console (separate login); main host → landing/dashboard.
+const ADMIN_HOST = process.env.ADMIN_HOST || 'admin.nextclaw.vn';
 app.get('/', async (req, reply) => {
+  reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  if (req.hostname === ADMIN_HOST) {
+    if (req.is_admin) return reply.type('text/html').send(renderAdmin());
+    return reply.type('text/html').send(renderAdminLogin({ nonAdmin: !!req.user_id }));
+  }
   if (!req.user_id) {
     return reply.type('text/html').send(renderLanding());
   }
-  // Force browsers (and CF) to revalidate every reload — the dashboard JS is
-  // inlined in this HTML so we never want a stale copy after a deploy.
-  reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   reply.type('text/html').send(renderApp());
 });
 
@@ -4093,7 +4097,7 @@ async function start(): Promise<void> {
   const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN ?? '';
   const INTERNAL_TENANT = process.env.DEFAULT_TENANT_ID ?? 'tuantran';
   // Public paths (no auth needed). `/` is special: serves landing for anon, dashboard for authed.
-  const PUBLIC_PATHS = new Set(['/', '/install.sh', '/favicon.ico', '/health']);
+  const PUBLIC_PATHS = new Set(['/', '/install.sh', '/favicon.ico', '/health', '/admin']);
   // Liveness probe for docker healthcheck / nginx / CI deploy wait. No auth, no DB.
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
   app.addHook('onRequest', async (req, reply) => {

@@ -22,10 +22,16 @@ import { sendEmail } from './email/resend-client.js';
 import { verifyEmailTemplate, welcomeTemplate } from './email/templates.js';
 import { randomBytes } from 'node:crypto';
 
+const ADMIN_HOST = process.env.ADMIN_HOST || 'admin.nextclaw.vn';
+
 export async function registerAdmin(app: FastifyInstance): Promise<void> {
   // ---- HTML page ----
-  app.get('/admin', { preHandler: requireAdmin }, async (_req, reply) => {
-    reply.type('text/html').send(renderAdmin());
+  // Admin lives on its own subdomain (admin.nextclaw.vn) with a separate login.
+  // The panel itself is served at '/' on the admin host (see server.ts root handler);
+  // /admin just bounces there so old links keep working.
+  app.get('/admin', async (req, reply) => {
+    if (req.hostname === ADMIN_HOST) return reply.redirect('/');
+    return reply.redirect('https://' + ADMIN_HOST + '/');
   });
 
   // ---- TENANTS LIST ----
@@ -224,7 +230,74 @@ function cryptoRandom(n: number): string {
 // =====================================================================
 // HTML page — single-page, three tabs (Tenants / Users / Create), dark theme
 // =====================================================================
-function renderAdmin(): string {
+export function renderAdminLogin(opts: { nonAdmin?: boolean } = {}): string {
+  const note = opts.nonAdmin
+    ? `<div class="msg show err">This account is not an administrator. <a href="/auth/logout" onclick="fetch('/auth/logout',{method:'POST',credentials:'same-origin'}).then(()=>location.reload());return false;">Sign out</a></div>`
+    : '';
+  return `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · nextclaw</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --ink:#0E1430; --ink-2:#131A3B; --text:#EAEDF7; --muted:#9AA3C7; --noise:#525a82;
+    --signal:#C2F24A; --signal-ink:#0E1430; --mint:#7CE3C4; --line:#242C57;
+    --display:'Space Grotesk',ui-sans-serif,system-ui,sans-serif; --body:'Inter',ui-sans-serif,system-ui,sans-serif; --mono:'Space Mono',ui-monospace,monospace; }
+  *{box-sizing:border-box;} html,body{margin:0;height:100%;}
+  body{font-family:var(--body);background:var(--ink);color:var(--text);display:flex;align-items:center;justify-content:center;padding:20px;
+    background-image:radial-gradient(800px 460px at 50% -10%, rgba(194,242,74,.07), transparent 60%);-webkit-font-smoothing:antialiased;}
+  .card{background:var(--ink-2);border:1px solid var(--line);border-radius:16px;padding:32px;width:100%;max-width:380px;box-shadow:0 30px 80px -40px rgba(0,0,0,.7);}
+  .brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:-.02em;}
+  .brand .mark{color:var(--signal);}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--noise);margin:4px 0 22px;text-transform:uppercase;}
+  h1{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.02em;margin:0 0 4px;}
+  .sub{font-size:12px;color:var(--muted);margin:0 0 18px;}
+  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:500;}
+  input{width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-size:14px;font-family:inherit;}
+  input:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px rgba(194,242,74,.12);}
+  button{width:100%;background:var(--signal);color:var(--signal-ink);border:0;padding:12px;border-radius:10px;font-size:14px;font-weight:600;font-family:var(--body);margin-top:20px;cursor:pointer;transition:transform .12s ease;}
+  button:hover:not(:disabled){transform:translateY(-1px);} button:disabled{opacity:.55;cursor:not-allowed;}
+  .msg{padding:10px 13px;border-radius:9px;font-size:13px;margin-bottom:14px;display:none;}
+  .msg.show{display:block;} .msg.err{background:rgba(255,120,130,.08);color:#ff9aa3;border:1px solid rgba(255,120,130,.25);}
+  .msg a{color:var(--mint);}
+</style>
+<script>function showMsg(t,x){var e=document.getElementById('msg');e.className='msg show '+t;e.innerHTML=x;}</script>
+</head><body>
+<div class="card">
+  <div class="brand"><span class="mark">&#9670;</span>nextclaw</div>
+  <div class="kicker">admin console</div>
+  <h1>Staff sign in</h1>
+  <p class="sub">Authorized administrators only.</p>
+  <div id="msg" class="msg"></div>
+  ${note}
+  <form id="f">
+    <label>Email</label>
+    <input name="email" type="email" required autocomplete="email">
+    <label>Password</label>
+    <input name="password" type="password" required autocomplete="current-password">
+    <button type="submit" id="btn">Sign in</button>
+  </form>
+  <script>
+  document.getElementById('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    var btn=document.getElementById('btn'); btn.disabled=true; btn.textContent='Signing in…';
+    var data=Object.fromEntries(new FormData(e.target));
+    try{
+      var r=await fetch('/auth/admin-login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'});
+      var j=await r.json();
+      if(j.ok){ location.href='/'; }
+      else{ showMsg('err', (j.message||'Sign in failed')); btn.disabled=false; btn.textContent='Sign in'; }
+    }catch(err){ showMsg('err','Network error'); btn.disabled=false; btn.textContent='Sign in'; }
+  });
+  </script>
+</div>
+</body></html>`;
+}
+
+export function renderAdmin(): string {
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
