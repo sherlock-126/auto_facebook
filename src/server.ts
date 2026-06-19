@@ -1397,7 +1397,7 @@ function renderApp(): string {
      only active-nav state + pills need bespoke CSS */
   nav#nav a.active { background: hsl(var(--accent)); color: hsl(var(--foreground)); font-weight: 600; }
   .pill { padding: 2px 9px; background: var(--bg-hover); border-radius: 999px; font-size: 10px; color: var(--text-2); white-space: nowrap; font-weight: 500; }
-  .pill.live { background: var(--success-soft); color: var(--success); }
+  .pill.live { background: var(--success-soft); color: hsl(var(--success)); }
   .pill.warn { background: var(--warning-soft); color: var(--warning); }
   .pill.err  { background: var(--danger-soft); color: var(--danger); }
 
@@ -1411,13 +1411,13 @@ function renderApp(): string {
   button.theme-toggle { background: transparent; color: var(--text-2); border: 1px solid hsl(var(--border)); width: 32px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; transition: background 0.12s; flex-shrink: 0; }
   button.theme-toggle:hover { background: hsl(var(--accent)); filter: none; }
 
-  button { background: var(--accent); color: white; border: 0; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: filter 0.12s, transform 0.06s; }
+  button { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); border: 1px solid hsl(var(--border)); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: filter 0.12s, transform 0.06s; }
   button:hover { filter: brightness(1.08); }
   button:active { transform: translateY(1px); }
   button.secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border-strong); }
   button.secondary:hover { background: var(--bg-hover); }
-  button.danger { background: var(--danger); }
-  button.success { background: var(--success); }
+  button.danger { background: hsl(var(--destructive)); color: white; border-color: transparent; }
+  button.success { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; font-weight: 600; }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
 
   input, select, textarea { background: var(--bg-input); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; transition: border 0.12s; }
@@ -1461,13 +1461,13 @@ function renderApp(): string {
   /* TOASTS */
   #toasts { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
   .toast { background: var(--bg-card); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); border-left: 4px solid var(--accent); max-width: 360px; pointer-events: auto; animation: slideIn .18s ease; }
-  .toast.success { border-left-color: var(--success); }
+  .toast.success { border-left-color: hsl(var(--success)); }
   .toast.error   { border-left-color: var(--danger); }
   @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
   .row-flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .muted { color: var(--text-muted); font-size: 11px; }
-  .s-ok      { color: var(--success); font-weight: 500; }
+  .s-ok      { color: hsl(var(--success)); font-weight: 500; }
   .s-running { color: var(--warning); font-weight: 500; }
   .s-error   { color: var(--danger); font-weight: 500; }
   .s-aborted { color: var(--danger); font-weight: 500; }
