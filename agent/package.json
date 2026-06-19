@@ -1,7 +1,7 @@
 {
   "name": "auto-facebook-agent",
   "version": "0.3.0",
-  "description": "fb.autonow.vn agent — runs on customer VPS, crawls FB groups, pushes data to cloud.",
+  "description": "nextclaw agent — runs on your VPS, crawls Facebook groups, pushes data to the cloud.",
   "type": "module",
   "main": "src/index.ts",
   "engines": {
