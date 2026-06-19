@@ -13,7 +13,7 @@ LOCK_FILE="/var/lib/auto-facebook-agent/login.lock"
 AGENT_USER="auto-fb-agent"
 
 if [ "$EUID" -ne 0 ]; then
-  echo "ERROR: phải chạy bằng root (sudo)."
+  echo "ERROR: must be run as root (sudo)."
   exit 1
 fi
 
@@ -34,4 +34,4 @@ chown -R "$AGENT_USER:$AGENT_USER" "$PROFILE"
 
 echo "==> Profile reset done. Next steps:"
 echo "    systemctl start auto-facebook-agent-login"
-echo "    Mở noVNC URL trên browser → login lại FB"
+echo "    Open the noVNC URL in a browser → log in to FB again"

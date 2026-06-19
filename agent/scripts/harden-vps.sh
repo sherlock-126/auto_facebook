@@ -3,15 +3,15 @@
 # Run after first install AND after every restore from backup.
 #
 # Fixes:
-#   1. Bootloader (chống lặp lại "grub rescue>")
-#   2. Cockpit + Portainer (vector brute-force port 9090 đã bị tấn công trước đây)
-#   3. UFW firewall — chỉ mở các cổng đang dùng
-#   4. fail2ban + whitelist IP cloud server (113.161.57.9) để khỏi tự ban
+#   1. Bootloader (prevent repeated "grub rescue>" loop)
+#   2. Cockpit + Portainer (port 9090 brute-force vector that was attacked before)
+#   3. UFW firewall — only open the ports in use
+#   4. fail2ban + whitelist cloud server IP (113.161.57.9) to avoid self-banning
 set -euo pipefail
 
-CLOUD_IP="113.161.57.9"   # public IP của fb.autonow.vn cloud — KHÔNG ban
+CLOUD_IP="113.161.57.9"   # public IP of nextclaw cloud — do NOT ban
 
-echo "==> [1/5] Reinstalling GRUB to /dev/sda (chống grub rescue lặp lại)"
+echo "==> [1/5] Reinstalling GRUB to /dev/sda (prevent grub-rescue loop)"
 grub-install /dev/sda
 update-grub
 
@@ -25,10 +25,10 @@ if command -v docker >/dev/null 2>&1; then
   docker rm -f portainer 2>/dev/null || true
 fi
 
-echo "==> [4/5] UFW firewall (ADD allow rules — KHÔNG reset, giữ rule có sẵn)"
+echo "==> [4/5] UFW firewall (ADD allow rules — do NOT reset, keep existing rules)"
 if ! command -v ufw >/dev/null 2>&1; then apt-get install -y ufw; fi
-# Add (idempotent) allow rules cho ports agent dùng — không reset, không thay
-# default policy. Khách hàng có thể đã có UFW config riêng; không phá.
+# Add (idempotent) allow rules for the ports the agent uses — do not reset, do not
+# change the default policy. The customer may already have their own UFW config; don't break it.
 for p in 22 24700 6092 80 443; do ufw allow $p/tcp >/dev/null 2>&1 || true; done
 ufw status verbose | head -10 || true
 
@@ -43,10 +43,10 @@ systemctl enable --now fail2ban
 fail2ban-client reload >/dev/null
 
 echo ""
-echo "✓ harden-vps.sh hoàn tất"
-echo "  - GRUB cài lại trên /dev/sda"
-echo "  - Cockpit + Portainer đã tắt + mask"
+echo "✓ harden-vps.sh complete"
+echo "  - GRUB reinstalled on /dev/sda"
+echo "  - Cockpit + Portainer stopped + masked"
 echo "  - UFW allow: 24700 6092 80 443 18789 18791"
 echo "  - fail2ban whitelist: $CLOUD_IP"
 echo ""
-echo "Smoke test từ máy khác:  curl -k -m 3 https://$(hostname -I | awk '{print $1}'):9090/  (expect refused)"
+echo "Smoke test from another machine:  curl -k -m 3 https://$(hostname -I | awk '{print $1}'):9090/  (expect refused)"

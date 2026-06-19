@@ -1,5 +1,5 @@
 [Unit]
-Description=fb.autonow.vn agent — websockify (noVNC web bridge, P0)
+Description=nextclaw agent — websockify (noVNC web bridge, P0)
 Documentation=https://fb.autonow.vn
 After=auto-facebook-agent-x11vnc.service
 Requires=auto-facebook-agent-x11vnc.service

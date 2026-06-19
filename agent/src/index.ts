@@ -1,5 +1,5 @@
 /**
- * fb.autonow.vn agent — entry point (Phase B v0.2).
+ * nextclaw agent — entry point (Phase B v0.2).
  *
  * Boot sequence:
  *   1. Load /etc/auto-facebook-agent/config.json

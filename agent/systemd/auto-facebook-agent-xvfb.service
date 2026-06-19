@@ -1,5 +1,5 @@
 [Unit]
-Description=fb.autonow.vn agent — Xvfb virtual display (P0 — keeps noVNC reachable)
+Description=nextclaw agent — Xvfb virtual display (P0 — keeps noVNC reachable)
 Documentation=https://fb.autonow.vn
 After=network-online.target
 Wants=network-online.target

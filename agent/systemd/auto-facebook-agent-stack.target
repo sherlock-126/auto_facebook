@@ -1,5 +1,5 @@
 [Unit]
-Description=fb.autonow.vn agent — browser stack (Xvfb + x11vnc + websockify)
+Description=nextclaw agent — browser stack (Xvfb + x11vnc + websockify)
 Documentation=https://fb.autonow.vn
 Wants=auto-facebook-agent-xvfb.service auto-facebook-agent-x11vnc.service auto-facebook-agent-websockify.service
 

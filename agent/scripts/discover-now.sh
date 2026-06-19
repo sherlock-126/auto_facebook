@@ -9,7 +9,7 @@
 set -euo pipefail
 
 if [ "$EUID" -ne 0 ]; then
-  echo "ERROR: phải chạy bằng root (sudo)."
+  echo "ERROR: must be run as root (sudo)."
   exit 1
 fi
 
@@ -38,4 +38,4 @@ sudo -u auto-fb-agent HOME=/opt/auto-facebook-agent \
 echo "==> Restarting ETL agent (cron resumes)"
 systemctl start auto-facebook-agent
 
-echo "✓ Done. Open dashboard at https://fb.autonow.vn/ to see new groups."
+echo "OK Done. Open your dashboard at https://nextclaw.vn/ to see new groups."

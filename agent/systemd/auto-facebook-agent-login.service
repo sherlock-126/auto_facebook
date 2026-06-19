@@ -1,5 +1,5 @@
 [Unit]
-Description=fb.autonow.vn agent — interactive Chrome for one-time FB login
+Description=nextclaw agent — interactive Chrome for one-time FB login
 Documentation=https://fb.autonow.vn
 After=auto-facebook-agent-stack.target
 Wants=auto-facebook-agent-stack.target

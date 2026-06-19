@@ -100,8 +100,8 @@ export async function executeCommand(
 
   if (cmd === 'crawl_now_incr') {
     // Same as cron tick but on-demand — only posts (no comments), all enabled
-    // groups. Used by dashboard "Chạy crawl ngay" button so customer doesn't
-    // wait up to 15min for next cron.
+    // groups. Used by the dashboard "Crawl now" button so the customer doesn't
+    // wait up to 15min for the next cron.
     const r = await triggerRun(cfg, 'incr', 'dashboard:crawl_now');
     if (!r.accepted) {
       log('info', 'crawl_now_incr: another run already in flight, skipping');

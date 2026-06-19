@@ -1,5 +1,5 @@
 [Unit]
-Description=fb.autonow.vn agent — x11vnc RFB server (P0 — keeps noVNC reachable)
+Description=nextclaw agent — x11vnc RFB server (P0 — keeps noVNC reachable)
 Documentation=https://fb.autonow.vn
 After=auto-facebook-agent-xvfb.service
 Requires=auto-facebook-agent-xvfb.service

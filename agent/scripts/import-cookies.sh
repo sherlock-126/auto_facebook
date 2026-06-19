@@ -26,12 +26,12 @@ AGENT_USER="auto-fb-agent"
 LOCK_FILE="/var/lib/auto-facebook-agent/login.lock"
 
 if [ "$EUID" -ne 0 ]; then
-  echo "ERROR: phải chạy bằng root (sudo)."
+  echo "ERROR: must be run as root (sudo)."
   exit 1
 fi
 
 if [ ! -f "$COOKIES_JSON" ]; then
-  echo "ERROR: file không tồn tại: $COOKIES_JSON"
+  echo "ERROR: file does not exist: $COOKIES_JSON"
   exit 1
 fi
 

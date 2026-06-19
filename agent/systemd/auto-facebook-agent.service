@@ -1,5 +1,5 @@
 [Unit]
-Description=fb.autonow.vn agent (heartbeat + crawler)
+Description=nextclaw agent (heartbeat + crawler)
 Documentation=https://fb.autonow.vn
 After=network-online.target auto-facebook-agent-stack.target
 Wants=network-online.target auto-facebook-agent-stack.target
