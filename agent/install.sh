@@ -112,19 +112,24 @@ if [ "$NEED_NODE" = true ]; then
 fi
 
 # ----- Chrome / Chromium -----
-banner "Installing Chrome (for Playwright)"
+# IMPORTANT: snap-packaged chromium is confined and CANNOT launch from the agent's
+# systemd service (cgroup/sandbox mismatch → "not a snap cgroup" → exit 1). So we
+# reject any snap browser and install a real .deb google-chrome-stable instead.
+banner "Installing Chrome (for the agent browser)"
 CHROME_BIN=""
-if command -v google-chrome >/dev/null 2>&1; then
-  CHROME_BIN=$(command -v google-chrome)
-  c_green "OK google-chrome found: $CHROME_BIN"
-elif command -v chromium >/dev/null 2>&1; then
-  CHROME_BIN=$(command -v chromium)
-  c_green "OK chromium found: $CHROME_BIN"
-elif command -v chromium-browser >/dev/null 2>&1; then
-  CHROME_BIN=$(command -v chromium-browser)
-  c_green "OK chromium-browser found: $CHROME_BIN"
-else
-  echo "Installing Google Chrome stable..."
+is_snap() { case "$1" in /snap/*) return 0;; *) return 1;; esac; }
+for cand in google-chrome google-chrome-stable chromium chromium-browser; do
+  p="$(command -v "$cand" 2>/dev/null || true)"
+  [ -n "$p" ] || continue
+  rp="$(readlink -f "$p" 2>/dev/null || echo "$p")"
+  if ! is_snap "$p" && ! is_snap "$rp"; then
+    CHROME_BIN="$p"; c_green "OK browser found: $CHROME_BIN"; break
+  else
+    c_yellow "Skipping snap browser $p (cannot run from systemd)."
+  fi
+done
+if [ -z "$CHROME_BIN" ]; then
+  echo "Installing Google Chrome stable (no non-snap browser found)..."
   curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
   echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
     > /etc/apt/sources.list.d/google-chrome.list
@@ -132,14 +137,9 @@ else
   if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq google-chrome-stable; then
     CHROME_BIN=$(command -v google-chrome)
     c_green "OK Google Chrome installed"
-  else
-    c_yellow "Google Chrome failed, falling back to chromium..."
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq chromium-browser || \
-      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq chromium
-    CHROME_BIN=$(command -v chromium-browser || command -v chromium)
   fi
 fi
-[ -n "$CHROME_BIN" ] || { c_red "ERROR: failed to install Chrome/Chromium"; exit 1; }
+[ -n "$CHROME_BIN" ] || { c_red "ERROR: could not find/install a non-snap Chrome/Chromium."; exit 1; }
 
 # ----- noVNC stack -----
 banner "Installing noVNC stack (Xvfb + x11vnc + websockify + novnc)"
