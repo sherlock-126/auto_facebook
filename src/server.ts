@@ -1669,31 +1669,65 @@ function renderApp(): string {
           </div>
         </div>
 
+        <!-- Health hint: surfaces the one button that fixes the current problem. -->
+        <div id="agentHealthHint" class="hidden" style="margin:0 0 14px; padding:12px 14px; border-radius:8px; background:#3a2a14; border:1px solid #6b4a1e; color:#ffd591; font-size:13px;"></div>
+
         <h4 style="margin:18px 0 8px">Actions</h4>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
           <button id="btnOpenFb" class="success">📱 Open Facebook (join groups)</button>
           <button id="btnCloseFb" class="danger" disabled>✕ Close Facebook</button>
           <button id="btnDiscoverNow" class="secondary" title="Re-scan your joined groups list (closes the FB tab if open, ~60s)">🔍 Refresh groups list</button>
           <button id="btnRunNow" class="secondary" title="Crawl all enabled groups now (do not wait for the */15 cron)">🚀 Run crawl now</button>
-          <button id="btnResetFingerprint" class="secondary" title="Clear the current VPS lock so the license can be used on another machine. Only run when the agent has been offline >5 min.">🔓 Reset VPS lock</button>
         </div>
         <div id="agentMsg" class="muted" style="font-size:12px; min-height:18px;"></div>
 
-        <div id="vncReady" class="hidden" style="margin-top:18px; padding:16px; background:#1f3f2a; border-radius:6px;">
-          <strong style="color:#9eecbe;">✓ Chrome is open on the VPS</strong><br>
-          <p style="margin:8px 0;">The Facebook tab opened automatically. If you lost the tab, click again:</p>
-          <a id="vncLink" href="#" target="_blank" rel="noopener" style="display:inline-block; background:#3b6ef0; color:#fff; padding:10px 20px; border-radius:6px; text-decoration:none; font-weight:600;">🚀 Reopen Facebook tab</a>
+        <!-- Embedded Facebook viewer — the FB login/Chrome streams here over an
+             HTTPS tunnel, no IP/port needed. Falls back to "open in new tab". -->
+        <div id="fbViewer" class="hidden" style="margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+            <strong style="color:#9eecbe;">🖥 Facebook — live on your VPS</strong>
+            <span style="display:flex; gap:12px; align-items:center;">
+              <a id="vncNewTab" href="#" target="_blank" rel="noopener" class="muted hidden" style="font-size:12px;">Open in new tab ↗</a>
+              <button id="btnCloseFbInline" class="danger" style="padding:4px 12px; font-size:12px;">✕ Close</button>
+            </span>
+          </div>
+          <div id="fbViewerWait" class="muted" style="padding:24px; text-align:center; background:var(--bg-card); border-radius:8px; font-size:13px;">⏳ Launching Chrome on your VPS and opening a secure viewer… (~1–2 min the first time)</div>
+          <div id="fbViewerFrameWrap" class="iframe-wrap hidden" style="height:70dvh;">
+            <iframe id="vncFrame" src="about:blank" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+          </div>
+          <div id="fbViewerFallback" class="hidden" style="font-size:12px; margin-top:8px; padding:10px 12px; background:#3a1c28; border-radius:6px; color:#ff9aa3;">
+            The embedded viewer couldn't load here. <a id="vncFallbackLink" href="#" target="_blank" rel="noopener" style="color:#fff; font-weight:600;">Open Facebook in a new tab ↗</a>
+          </div>
         </div>
 
-        <details style="margin-top:24px;">
-          <summary class="muted" style="cursor:pointer;">Detailed guide</summary>
-          <ol style="font-size:13px; color:var(--text-muted); margin-top:8px;">
-            <li><strong>Open Facebook</strong> → the agent launches Chrome on the VPS (~10s)</li>
-            <li>When ready, click <strong>"Open new Facebook tab"</strong> → a new tab shows FB over noVNC</li>
-            <li>In noVNC: log into FB (if needed) or click <strong>Groups</strong> → join the groups you want to crawl</li>
-            <li>Close the noVNC tab and click <strong>"Close Facebook"</strong> on the dashboard</li>
-            <li>Click <strong>"Refresh groups list"</strong> → new groups appear in the Groups tab</li>
-            <li>Enable the groups you want to crawl → wait for the 2h cron (or trigger discover)</li>
+        <!-- Diagnostics & self-serve recovery — everything here is a button, no SSH. -->
+        <details id="agentDiag" style="margin-top:22px;">
+          <summary class="muted" style="cursor:pointer;">🩺 Diagnostics &amp; recovery</summary>
+          <div id="diagGrid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:12px 0; font-size:12px;">
+            <div style="background:var(--bg-card); padding:10px 12px; border-radius:6px;">
+              <div class="muted" style="text-transform:uppercase; font-size:10px;">Browser</div>
+              <div id="diagBrowser" style="margin-top:4px;">—</div>
+            </div>
+            <div style="background:var(--bg-card); padding:10px 12px; border-radius:6px;">
+              <div class="muted" style="text-transform:uppercase; font-size:10px;">Disk</div>
+              <div id="diagDisk" style="margin-top:4px;">—</div>
+            </div>
+            <div style="background:var(--bg-card); padding:10px 12px; border-radius:6px;">
+              <div class="muted" style="text-transform:uppercase; font-size:10px;">Network</div>
+              <div id="diagNet" style="margin-top:4px;">—</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+            <button id="btnResetProfile" class="secondary" title="Clears the saved Facebook session on the VPS. Use when login is stuck in a verification/captcha loop, or to switch FB accounts.">🔄 Reset Facebook login</button>
+            <button id="btnRepairBrowser" class="secondary" title="Installs a proper Chrome and points the agent at it. Use if the browser shows snap/missing below.">🛠 Repair browser</button>
+            <button id="btnRestartAgent" class="secondary" title="Restarts the agent service on your VPS.">♻ Restart agent</button>
+            <button id="btnResetFingerprint" class="secondary" title="Clear the current VPS lock so the license can be used on another machine. Only run when the agent has been offline >5 min.">🔓 Reset VPS lock</button>
+          </div>
+          <ol style="font-size:13px; color:var(--text-muted); margin-top:16px;">
+            <li><strong>Open Facebook</strong> → the agent launches Chrome on the VPS and the screen appears above (~1–2 min)</li>
+            <li>Log into Facebook (if needed), or click <strong>Groups</strong> → join the groups you want to crawl</li>
+            <li>Click <strong>Close</strong>, then <strong>Refresh groups list</strong> → new groups appear in the Groups tab</li>
+            <li>Stuck on a verification loop? Click <strong>Reset Facebook login</strong> and try again.</li>
           </ol>
         </details>
       </div>
@@ -2287,14 +2321,87 @@ async function loadAgentStatus() {
       $('btnRunNow').textContent = j.run_in_flight ? '🔄 Crawl running…' : '🚀 Run crawl now';
     }
 
-    if (j.login_active && j.vnc_public_url) {
-      $('vncReady').classList.remove('hidden');
-      $('vncLink').href = j.vnc_public_url;
-    } else {
-      $('vncReady').classList.add('hidden');
-    }
+    renderFbViewer(j);
+    renderAgentDiag(j);
   } catch (e) {
     console.warn('agent status failed', e);
+  }
+}
+
+// Embedded Facebook viewer: stream the VPS Chrome into the dashboard over the
+// HTTPS tunnel. Falls back to "open in new tab" when the URL is not embeddable
+// (http direct IP) or the iframe is blocked.
+function renderFbViewer(j) {
+  const viewer = $('fbViewer');
+  if (!viewer) return;
+  const url = j.vnc_public_url || '';
+  const show = j.login_active || window._fbViewerWanted;
+  if (!show) {
+    viewer.classList.add('hidden');
+    const f = $('vncFrame');
+    if (f && f.dataset.url) { f.src = 'about:blank'; f.dataset.url = ''; }
+    return;
+  }
+  viewer.classList.remove('hidden');
+  const ready = j.login_active && url;
+  const wait = $('fbViewerWait'), wrap = $('fbViewerFrameWrap'), fb = $('fbViewerFallback'), nt = $('vncNewTab');
+  if (ready && j.vnc_embeddable) {
+    wait.classList.add('hidden'); wrap.classList.remove('hidden'); fb.classList.add('hidden');
+    const f = $('vncFrame');
+    if (f.dataset.url !== url) { f.src = url; f.dataset.url = url; }  // set once — avoid reconnect churn
+    nt.href = url; nt.classList.remove('hidden');
+  } else if (ready) {
+    // http direct URL (no tunnel) — cannot embed in HTTPS dashboard. Offer new tab.
+    wait.classList.add('hidden'); wrap.classList.add('hidden'); fb.classList.remove('hidden');
+    $('vncFallbackLink').href = url; nt.href = url; nt.classList.remove('hidden');
+  } else {
+    wait.classList.remove('hidden'); wrap.classList.add('hidden'); fb.classList.add('hidden');
+    nt.classList.add('hidden');
+  }
+}
+
+// Diagnostics card + the single health hint that tells the user which button to press.
+function renderAgentDiag(j) {
+  const b = $('diagBrowser');
+  if (b) {
+    if (j.chrome_type === 'snap')        b.innerHTML = '🔴 snap (cannot run) — repair';
+    else if (j.chrome_type === 'missing') b.innerHTML = '🔴 missing — repair';
+    else if (j.chrome_ok)                b.textContent = '🟢 OK (Chrome)';
+    else                                 b.textContent = '—';
+  }
+  const d = $('diagDisk');
+  if (d) {
+    if (j.disk_used_pct == null) d.textContent = '—';
+    else {
+      const p = j.disk_used_pct;
+      const icon = p >= 90 ? '🔴' : (p >= 75 ? '🟡' : '🟢');
+      d.textContent = icon + ' ' + p + '% used' + (j.disk_avail_gb != null ? ' · ' + j.disk_avail_gb + ' GB free' : '');
+    }
+  }
+  const n = $('diagNet');
+  if (n) {
+    const parts = [];
+    if (j.lan_ip) parts.push('LAN ' + j.lan_ip);
+    if (j.tailscale_ip) parts.push('Tailscale ' + j.tailscale_ip);
+    n.textContent = parts.length ? parts.join(' · ') : '—';
+  }
+  const hint = $('agentHealthHint');
+  if (!hint) return;
+  let h = '';
+  if (j.online_status === 'online') {
+    // Only alarm on a definitively-bad REPORTED state — agents older than v0.5.0
+    // do not send chrome_type, and we must not nag them with a false alarm.
+    if (j.chrome_type === 'snap' || j.chrome_type === 'missing')
+      h = '⚠ Browser problem on the VPS (' + j.chrome_type + '). Open <strong>Diagnostics &amp; recovery</strong> below and click <strong>🛠 Repair browser</strong>, then Open Facebook again.';
+    else if (j.disk_used_pct != null && j.disk_used_pct >= 92)
+      h = '⚠ Disk almost full on the VPS (' + j.disk_used_pct + '%). Crawling may start failing — free up space.';
+  }
+  if (h) {
+    hint.innerHTML = h;
+    hint.classList.remove('hidden');
+    if (!window._diagAutoOpened) { const dt = $('agentDiag'); if (dt) dt.open = true; window._diagAutoOpened = true; }
+  } else {
+    hint.classList.add('hidden');
   }
 }
 
@@ -2315,13 +2422,30 @@ async function sendAgentCmd(cmd) {
 }
 
 $('btnOpenFb').onclick = () => {
-  // Open bridge page in NEW TAB immediately. Page handles command + polling +
-  // auto-redirect to noVNC. User just clicks once and waits in the new tab.
-  window.open('/fb-launcher', '_blank', 'noopener,noreferrer');
+  // Launch Chrome on the VPS + an HTTPS viewer tunnel, then stream it INTO the
+  // dashboard (no new tab, no IP). The poll loop fills the iframe when ready.
+  window._fbViewerWanted = true;
+  sendAgentCmd('open_login');
+  const v = $('fbViewer'); if (v) { v.classList.remove('hidden'); v.scrollIntoView({behavior:'smooth', block:'nearest'}); }
 };
-$('btnCloseFb').onclick    = () => sendAgentCmd('close_login');
+function closeFb() { window._fbViewerWanted = false; sendAgentCmd('close_login'); }
+$('btnCloseFb').onclick    = closeFb;
+$('btnCloseFbInline') && ($('btnCloseFbInline').onclick = closeFb);
 $('btnDiscoverNow').onclick = () => sendAgentCmd('discover_groups_only');
 $('btnRunNow') && ($('btnRunNow').onclick = () => sendAgentCmd('crawl_now_incr'));
+$('btnResetProfile') && ($('btnResetProfile').onclick = () => {
+  if (!confirm('Reset the Facebook login on your VPS?\\n\\nThis clears the saved session — you will need to log into Facebook again. Use this when login is stuck in a verification/captcha loop or to switch accounts.')) return;
+  window._fbViewerWanted = false;
+  sendAgentCmd('reset_profile');
+});
+$('btnRepairBrowser') && ($('btnRepairBrowser').onclick = () => {
+  if (!confirm('Repair the browser on your VPS?\\n\\nThis installs Google Chrome and restarts the agent (~1 min). Use it when the browser shows snap or missing.')) return;
+  sendAgentCmd('repair_browser');
+});
+$('btnRestartAgent') && ($('btnRestartAgent').onclick = () => {
+  if (!confirm('Restart the agent service on your VPS? It reconnects within ~1 min.')) return;
+  sendAgentCmd('restart_agent');
+});
 $('btnResetFingerprint') && ($('btnResetFingerprint').onclick = async () => {
   if (!confirm('Reset the VPS lock? The next heartbeat from any machine will become the new locked-in machine.\\n\\nOnly do this if you are migrating VPS or changing the hostname.')) return;
   const r = await fetch('/api/agent/reset-fingerprint', { method:'POST', credentials:'same-origin' });

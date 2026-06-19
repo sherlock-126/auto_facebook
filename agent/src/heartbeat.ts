@@ -8,6 +8,7 @@
  */
 import os from 'node:os';
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { AGENT_VERSION } from './version.js';
 import { profileLooksLoggedIn } from './fb/session.js';
 import { getRunState } from './scheduler.js';
@@ -22,9 +23,63 @@ export class AuthFailedError extends Error {
 export interface HeartbeatResponse {
   ok:           boolean;
   server_time?: string;
-  command?:         'open_login' | 'close_login' | 'discover_now' | 'discover_groups_only' | 'refresh_owner_profile' | null;
+  command?:         'open_login' | 'close_login' | 'discover_now' | 'discover_groups_only' | 'refresh_owner_profile' | 'crawl_now_incr' | 'post_to_group' | 'comment_on_post' | 'reset_profile' | 'repair_browser' | 'restart_agent' | null;
   command_payload?: { nav_url?: string } | null;
   config?:          { heartbeat_interval_sec?: number };
+}
+
+const TUNNEL_URL_FILE = '/var/lib/auto-facebook-agent/vnc-tunnel-url';
+
+/**
+ * The viewer URL the dashboard should use. Prefer the on-demand Cloudflare tunnel
+ * (HTTPS → embeddable in the dashboard iframe, works behind NAT). Fall back to the
+ * direct http://<ip>:<port> URL (only usable via "open in new tab" on a public-IP
+ * VPS). Returns null when neither is available.
+ */
+function readVncUrl(cfg: AgentConfig): string | null {
+  // 1. Tunnel file (written by vnc-tunnel.sh while a login session is open).
+  try {
+    if (existsSync(TUNNEL_URL_FILE)) {
+      const base = readFileSync(TUNNEL_URL_FILE, 'utf8').trim().replace(/\/+$/, '');
+      if (/^https:\/\//.test(base) && cfg.vnc_password) {
+        return `${base}/vnc.html?autoconnect=true&resize=scale&password=${encodeURIComponent(cfg.vnc_password)}`;
+      }
+    }
+  } catch { /* fall through to direct URL */ }
+  // 2. Direct IP fallback.
+  if (!cachedIp) cachedIp = detectPublicIp();
+  if (cachedIp && cfg.vnc_password) {
+    return `http://${cachedIp}:${cfg.vnc_port}/vnc.html?autoconnect=true&resize=scale&password=${encodeURIComponent(cfg.vnc_password)}`;
+  }
+  return null;
+}
+
+/** Browser binary health — surfaced in the dashboard diagnostics card. */
+function detectBrowser(): { type: 'snap' | 'deb' | 'missing'; ok: boolean; path: string | null } {
+  const p = process.env.CHROME_PATH || null;
+  if (!p || !existsSync(p)) return { type: 'missing', ok: false, path: p };
+  return { type: p.startsWith('/snap/') ? 'snap' : 'deb', ok: true, path: p };
+}
+
+/** First non-internal IPv4 — shown as a diagnostic / fallback access hint. */
+function detectLanIp(): string | null {
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family === 'IPv4' && !a.internal && !a.address.startsWith('100.')) return a.address;
+    }
+  }
+  return null;
+}
+
+/** Tailscale CGNAT IP (100.64.0.0/10) if the agent is on a tailnet. */
+function detectTailscaleIp(): string | null {
+  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family !== 'IPv4' || a.internal) continue;
+      if (name.startsWith('tailscale') || /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)) return a.address;
+    }
+  }
+  return null;
 }
 
 function isUnitActive(unit: string): boolean {
@@ -60,10 +115,8 @@ export async function sendHeartbeat(
   cfg: AgentConfig,
   state: { last_command?: string; last_command_at?: string } = {},
 ): Promise<HeartbeatResponse> {
-  if (!cachedIp) cachedIp = detectPublicIp();
-  const vncUrl = cachedIp && cfg.vnc_password
-    ? `http://${cachedIp}:${cfg.vnc_port}/vnc.html?autoconnect=true&resize=scale&password=${encodeURIComponent(cfg.vnc_password)}`
-    : null;
+  const vncUrl = readVncUrl(cfg);
+  const browser = detectBrowser();
 
   const runState = getRunState();
   const owner = readCachedOwnerProfile();
@@ -91,6 +144,11 @@ export async function sendHeartbeat(
     owner_avatar_url: owner?.avatar_url ?? null,
     disk_used_pct:    disk.used_pct,
     disk_avail_gb:    disk.avail_gb,
+    // Diagnostics for the dashboard health card (snap detection, NAT hints).
+    chrome_type:      browser.type,
+    chrome_ok:        browser.ok,
+    lan_ip:           detectLanIp(),
+    tailscale_ip:     detectTailscaleIp(),
     // Mirror local watermark state to cloud — survives backup-restore.
     watermarks:       getAllWatermarks(),
   };

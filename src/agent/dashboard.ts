@@ -13,8 +13,8 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import { statusOf } from './status.js';
 
-type Command = 'open_login' | 'close_login' | 'discover_now' | 'discover_groups_only' | 'refresh_owner_profile' | 'crawl_now_incr' | 'post_to_group' | 'comment_on_post';
-const VALID_CMDS: Set<Command> = new Set(['open_login', 'close_login', 'discover_now', 'discover_groups_only', 'refresh_owner_profile', 'crawl_now_incr', 'post_to_group', 'comment_on_post']);
+type Command = 'open_login' | 'close_login' | 'discover_now' | 'discover_groups_only' | 'refresh_owner_profile' | 'crawl_now_incr' | 'post_to_group' | 'comment_on_post' | 'reset_profile' | 'repair_browser' | 'restart_agent';
+const VALID_CMDS: Set<Command> = new Set(['open_login', 'close_login', 'discover_now', 'discover_groups_only', 'refresh_owner_profile', 'crawl_now_incr', 'post_to_group', 'comment_on_post', 'reset_profile', 'repair_browser', 'restart_agent']);
 
 export async function registerAgentDashboardRoutes(app: FastifyInstance): Promise<void> {
   // ---- ISSUE COMMAND ----
@@ -57,7 +57,8 @@ export async function registerAgentDashboardRoutes(app: FastifyInstance): Promis
     if (!req.user_id) return reply.status(401).send({ error: 'unauthorized' });
     const tid = req.tenant_id!;
     const { rows } = await pool.query(
-      `SELECT agent_version, last_seen_at, login_active, fb_session_alive, vnc_public_url, metadata
+      `SELECT agent_version, last_seen_at, login_active, fb_session_alive, vnc_public_url,
+              disk_used_pct, disk_avail_gb, metadata
          FROM agent_connections WHERE tenant_id = $1`,
       [tid]
     );
@@ -80,6 +81,15 @@ export async function registerAgentDashboardRoutes(app: FastifyInstance): Promis
       login_active:      r.login_active,
       fb_session_alive:  r.fb_session_alive,
       vnc_public_url:    r.vnc_public_url || null,
+      // noVNC viewer embeddable only when served over HTTPS (Cloudflare tunnel).
+      vnc_embeddable:    typeof r.vnc_public_url === 'string' && r.vnc_public_url.startsWith('https://'),
+      // Diagnostics (dashboard health card + health-driven button hints).
+      disk_used_pct:     r.disk_used_pct ?? null,
+      disk_avail_gb:     r.disk_avail_gb ?? null,
+      chrome_type:       r.metadata?.chrome_type ?? null,
+      chrome_ok:         r.metadata?.chrome_ok === true,
+      lan_ip:            r.metadata?.lan_ip ?? null,
+      tailscale_ip:      r.metadata?.tailscale_ip ?? null,
       pending_commands:  q,
       pending_count:     q.length,
       last_command:      r.metadata?.last_command ?? null,

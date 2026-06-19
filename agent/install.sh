@@ -147,6 +147,23 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   xvfb x11vnc websockify novnc fonts-noto-color-emoji >/dev/null
 c_green "OK noVNC stack installed"
 
+# ----- cloudflared (on-demand HTTPS tunnel for the noVNC viewer) -----
+# Lets the customer reach/embed the Facebook-login screen from the dashboard over
+# HTTPS without exposing port 6092 or knowing any IP — works behind NAT/firewall.
+banner "Installing cloudflared (secure viewer tunnel)"
+if command -v cloudflared >/dev/null 2>&1; then
+  c_green "OK cloudflared already installed ($(command -v cloudflared))"
+else
+  CF_ARCH="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
+  case "$CF_ARCH" in arm64) CF_BIN=cloudflared-linux-arm64;; *) CF_BIN=cloudflared-linux-amd64;; esac
+  if curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/${CF_BIN}" -o /usr/local/bin/cloudflared; then
+    chmod +x /usr/local/bin/cloudflared
+    c_green "OK cloudflared installed"
+  else
+    c_yellow "WARNING: cloudflared download failed — embedded viewer will fall back to the direct IP URL"
+  fi
+fi
+
 # ----- system user -----
 if ! id "$AGENT_USER" >/dev/null 2>&1; then
   banner "Creating system user $AGENT_USER"
@@ -251,6 +268,9 @@ install -m 644 "$INSTALL_DIR/systemd/auto-facebook-agent-stack.target"       /et
 install -m 644 "$INSTALL_DIR/systemd/auto-facebook-agent.service"            "$SYSTEMD_AGENT"
 install -m 644 "$INSTALL_DIR/systemd/auto-facebook-agent-login.service"      "$SYSTEMD_LOGIN"
 chmod +x "$INSTALL_DIR/scripts/login.sh"
+# Self-serve recovery + viewer scripts invoked via sudo from the dashboard.
+chmod +x "$INSTALL_DIR/scripts/reset-profile.sh" "$INSTALL_DIR/scripts/repair-browser.sh" \
+         "$INSTALL_DIR/scripts/restart-agent.sh" "$INSTALL_DIR/scripts/vnc-tunnel.sh" 2>/dev/null || true
 systemctl daemon-reload
 systemctl enable --now auto-facebook-agent-stack.target
 systemctl enable --now auto-facebook-agent-xvfb auto-facebook-agent-x11vnc auto-facebook-agent-websockify
@@ -268,6 +288,13 @@ cat > /etc/sudoers.d/auto-facebook-agent <<EOF
 auto-fb-agent ALL=(root) NOPASSWD: /bin/systemctl start auto-facebook-agent-login
 auto-fb-agent ALL=(root) NOPASSWD: /bin/systemctl stop auto-facebook-agent-login
 auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/discover-now.sh
+# Self-serve recovery buttons (reset captcha loop / repair browser / restart).
+auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/reset-profile.sh
+auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/repair-browser.sh
+auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/restart-agent.sh
+# On-demand HTTPS viewer tunnel (exact args only).
+auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/vnc-tunnel.sh start
+auto-fb-agent ALL=(root) NOPASSWD: /opt/auto-facebook-agent/scripts/vnc-tunnel.sh stop
 EOF
 chmod 440 /etc/sudoers.d/auto-facebook-agent
 visudo -c -q -f /etc/sudoers.d/auto-facebook-agent && c_green "OK sudoers OK" || c_red "WARNING: sudoers syntax error"
@@ -305,28 +332,18 @@ c_green "═══════════════════════�
 c_green "  OK Agent installed successfully!"
 c_green "════════════════════════════════════════════════════════════════"
 echo
-c_yellow "━━━ FIRST-TIME FACEBOOK LOGIN (one time only) ━━━"
+c_yellow "━━━ YOU ARE DONE IN THE TERMINAL — EVERYTHING ELSE IS IN THE DASHBOARD ━━━"
 echo
-echo "  1. Start Chrome (uses ~1.5GB RAM for a few minutes):"
+echo "  1. Open the dashboard:  $CLOUD_BASE_URL/  (log in with your registered email)"
+echo "  2. Go to Setup -> Connection. You should see the agent come ONLINE within ~60s."
+echo "  3. Click \"Open Facebook\" -> the Facebook login appears right in the dashboard."
+echo "     Log in, join the groups you want, then click \"Close\"."
+echo "  4. If anything looks wrong, the dashboard shows a one-click fix:"
+echo "       - \"Reset Facebook login\"  (verification/captcha loop)"
+echo "       - \"Repair browser\"        (browser issues)"
+echo "       - \"Restart agent\"         (general reconnect)"
 echo
-echo "     systemctl start auto-facebook-agent-login"
-echo
-echo "  2. Open a browser and go to the noVNC link:"
-echo
-echo "     $NOVNC_URL"
-echo
-echo "  3. A Chrome window appears in noVNC -> log in to Facebook as usual."
-echo
-echo "  4. Done -> systemctl stop auto-facebook-agent-login"
-echo "     (kiosk mode has no X button; you must use systemctl stop)"
-echo "     The ETL agent crawls automatically every 2h."
-echo
-echo "  5. Force a crawl now (test):"
-echo "     systemctl restart auto-facebook-agent"
-echo
-echo "  WARNING: IF FACEBOOK SHOWS A CAPTCHA LOOP / LOGIN FAILS:"
-echo "     bash /opt/auto-facebook-agent/scripts/reset-profile.sh"
-echo "     (clears cookies/cache -> log in again from scratch)"
+echo "  No more SSH commands are required. The agent crawls automatically."
 echo
 
 # Run hardening (GRUB fix + mask Cockpit + UFW allow + fail2ban). Idempotent.
@@ -337,20 +354,17 @@ if [ "${SKIP_HARDEN:-0}" != "1" ] && [ -f "$INSTALL_DIR/scripts/harden-vps.sh" ]
   echo
 fi
 
-c_yellow "━━━ AGENT INFO ━━━"
+c_yellow "━━━ AGENT INFO (for support only — you do not need these) ━━━"
 echo
-echo "  Dashboard data:   $CLOUD_BASE_URL/  (log in to nextclaw with your registered email)"
-echo "  noVNC URL:        $NOVNC_URL"
-echo "  noVNC password:   $VNC_PASS"
-echo "  View agent log:   journalctl -fu auto-facebook-agent"
-echo "  View stack log:   journalctl -u auto-facebook-agent-stack -n 50"
-echo "  Config:           $CONFIG_FILE"
+echo "  Dashboard:           $CLOUD_BASE_URL/  (log in with your registered email)"
+echo "  Direct noVNC (alt):  $NOVNC_URL"
+echo "  noVNC password:      $VNC_PASS"
+echo "  View agent log:      journalctl -fu auto-facebook-agent"
+echo "  Config:              $CONFIG_FILE"
 echo
-c_yellow "━━━ FIREWALL ━━━"
-echo
-echo "  Port $NOVNC_WEB_PORT must be open inbound. Hetzner/Vultr/DO open it by default."
-echo "  AWS/GCP/Azure: add port $NOVNC_WEB_PORT to the security group / firewall."
-echo "  Test it: from another machine run:  curl -m 3 http://${PUBLIC_IP}:${NOVNC_WEB_PORT}/"
+echo "  The dashboard opens Facebook over a secure HTTPS tunnel, so port"
+echo "  $NOVNC_WEB_PORT does NOT need to be open inbound and you do not need a public IP."
+echo "  (The direct noVNC URL above only works if $NOVNC_WEB_PORT is reachable.)"
 echo
 c_yellow "━━━ UNINSTALL ━━━"
 echo

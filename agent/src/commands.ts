@@ -31,9 +31,10 @@ async function reportActionResult(cfg: AgentConfig, body: Record<string, any>): 
   }
 }
 
-export type AgentCommand = 'open_login' | 'close_login' | 'discover_now' | 'discover_groups_only' | 'refresh_owner_profile' | 'crawl_now_incr' | 'post_to_group' | 'comment_on_post';
+export type AgentCommand = 'open_login' | 'close_login' | 'discover_now' | 'discover_groups_only' | 'refresh_owner_profile' | 'crawl_now_incr' | 'post_to_group' | 'comment_on_post' | 'reset_profile' | 'repair_browser' | 'restart_agent';
 
 const LOGIN_LOCK = '/var/lib/auto-facebook-agent/login.lock';
+const SCRIPTS = '/opt/auto-facebook-agent/scripts';
 
 interface SudoSpec {
   argv: string[];
@@ -42,6 +43,13 @@ interface SudoSpec {
 const SUDO_CMDS: Record<string, SudoSpec> = {
   open_login:   { argv: ['sudo', '-n', '/bin/systemctl', 'start', 'auto-facebook-agent-login'] },
   close_login:  { argv: ['sudo', '-n', '/bin/systemctl', 'stop',  'auto-facebook-agent-login'] },
+  // Self-serve recovery (dashboard buttons) — each maps to a whitelisted script.
+  reset_profile:    { argv: ['sudo', '-n', `${SCRIPTS}/reset-profile.sh`] },
+  repair_browser:   { argv: ['sudo', '-n', `${SCRIPTS}/repair-browser.sh`] },
+  restart_agent:    { argv: ['sudo', '-n', `${SCRIPTS}/restart-agent.sh`] },
+  // On-demand HTTPS tunnel for the embedded noVNC viewer.
+  vnc_tunnel_start: { argv: ['sudo', '-n', `${SCRIPTS}/vnc-tunnel.sh`, 'start'] },
+  vnc_tunnel_stop:  { argv: ['sudo', '-n', `${SCRIPTS}/vnc-tunnel.sh`, 'stop'] },
 };
 
 async function runSudo(spec: SudoSpec): Promise<{ ok: boolean; err?: string }> {
@@ -81,11 +89,31 @@ export async function executeCommand(
       const url = /^https?:\/\/(www\.)?facebook\.com\//.test(target) ? target : 'https://www.facebook.com/';
       writeFileSync(navFile, url);
     } catch (e: any) { log('warn', `failed to write nav url: ${e?.message}`); }
-    return runSudo(SUDO_CMDS[cmd]);
+    // Start the login Chrome AND the HTTPS noVNC tunnel concurrently. The tunnel
+    // is best-effort: if cloudflared is rate-limited the agent still reports the
+    // direct IP URL as a fallback, so login itself never blocks on it.
+    const [loginRes, tunnelRes] = await Promise.all([
+      runSudo(SUDO_CMDS.open_login),
+      runSudo(SUDO_CMDS.vnc_tunnel_start),
+    ]);
+    if (!tunnelRes.ok) log('warn', `vnc tunnel start failed (falling back to direct URL): ${tunnelRes.err}`);
+    return loginRes;
   }
 
   if (cmd === 'close_login') {
-    return runSudo(SUDO_CMDS[cmd]);
+    const r = await runSudo(SUDO_CMDS.close_login);
+    void runSudo(SUDO_CMDS.vnc_tunnel_stop); // best-effort cleanup of the tunnel
+    return r;
+  }
+
+  if (cmd === 'reset_profile' || cmd === 'repair_browser' || cmd === 'restart_agent') {
+    // Self-serve recovery — clear the Chrome profile (captcha/login loop), install
+    // a real Chrome (snap fix), or restart the agent. Each is a whitelisted script.
+    log('info', `${cmd}: running recovery script`);
+    const r = await runSudo(SUDO_CMDS[cmd]);
+    if (r.ok) log('info', `${cmd}: done`);
+    else      log('warn', `${cmd}: failed: ${r.err}`);
+    return r;
   }
 
   if (cmd === 'discover_now') {

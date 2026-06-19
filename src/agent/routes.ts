@@ -41,6 +41,11 @@ interface HeartbeatBody {
   // v0.5+: root filesystem disk usage on the agent VPS (powers disk alerts).
   disk_used_pct?:    number | null;
   disk_avail_gb?:    number | null;
+  // v0.7+: agent self-diagnostics surfaced in the dashboard health card.
+  chrome_type?:      string | null;   // 'snap' | 'deb' | 'missing'
+  chrome_ok?:        boolean;
+  lan_ip?:           string | null;
+  tailscale_ip?:     string | null;
   // v0.6+: agent's local watermark snapshot — mirrored to cloud DB so it
   // survives backup-restore / VPS migration. Cloud is authoritative on next
   // agent boot (GET /api/agent/watermarks during startup).
@@ -99,6 +104,11 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
         run_groups_done:  Number.isFinite(body.run_groups_done)  ? body.run_groups_done  : null,
         run_groups_total: Number.isFinite(body.run_groups_total) ? body.run_groups_total : null,
         run_current_group: body.run_current_group ?? null,
+        // Self-diagnostics (dashboard health card).
+        chrome_type:      typeof body.chrome_type === 'string' ? body.chrome_type.slice(0, 16) : null,
+        chrome_ok:        body.chrome_ok === true,
+        lan_ip:           typeof body.lan_ip === 'string' ? body.lan_ip.slice(0, 64) : null,
+        tailscale_ip:     typeof body.tailscale_ip === 'string' ? body.tailscale_ip.slice(0, 64) : null,
       };
       const loginActive    = body.login_active === true;
       const fbSessionAlive = body.fb_session_alive === true;
