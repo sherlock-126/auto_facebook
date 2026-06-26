@@ -54,16 +54,28 @@ function readVncUrl(cfg: AgentConfig): string | null {
   return null;
 }
 
-/** Browser binary health — surfaced in the dashboard diagnostics card. */
+/** Browser binary health — surfaced in the dashboard diagnostics card. Best-effort. */
 function detectBrowser(): { type: 'snap' | 'deb' | 'missing'; ok: boolean; path: string | null } {
-  const p = process.env.CHROME_PATH || null;
-  if (!p || !existsSync(p)) return { type: 'missing', ok: false, path: p };
-  return { type: p.startsWith('/snap/') ? 'snap' : 'deb', ok: true, path: p };
+  try {
+    const p = process.env.CHROME_PATH || null;
+    if (!p || !existsSync(p)) return { type: 'missing', ok: false, path: p };
+    return { type: p.startsWith('/snap/') ? 'snap' : 'deb', ok: true, path: p };
+  } catch { return { type: 'missing', ok: false, path: null }; }
 }
 
-/** First non-internal IPv4 — shown as a diagnostic / fallback access hint. */
+/**
+ * os.networkInterfaces() can throw a libuv system error — observed in the wild as
+ * EAFNOSUPPORT(97) "uv_interface_addresses returned Unknown system error 97" when
+ * an interface is flapping (e.g. a TUN device like tailscale0, or docker0 going
+ * up/down). It is NEVER worth killing the heartbeat over a diagnostic, so swallow.
+ */
+function safeNICs(): ReturnType<typeof os.networkInterfaces> {
+  try { return os.networkInterfaces(); } catch { return {}; }
+}
+
+/** First non-internal IPv4 — shown as a diagnostic / fallback access hint. Best-effort. */
 function detectLanIp(): string | null {
-  for (const addrs of Object.values(os.networkInterfaces())) {
+  for (const addrs of Object.values(safeNICs())) {
     for (const a of addrs ?? []) {
       if (a.family === 'IPv4' && !a.internal && !a.address.startsWith('100.')) return a.address;
     }
@@ -71,9 +83,9 @@ function detectLanIp(): string | null {
   return null;
 }
 
-/** Tailscale CGNAT IP (100.64.0.0/10) if the agent is on a tailnet. */
+/** Tailscale CGNAT IP (100.64.0.0/10) if the agent is on a tailnet. Best-effort. */
 function detectTailscaleIp(): string | null {
-  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
+  for (const [name, addrs] of Object.entries(safeNICs())) {
     for (const a of addrs ?? []) {
       if (a.family !== 'IPv4' || a.internal) continue;
       if (name.startsWith('tailscale') || /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)) return a.address;
