@@ -274,7 +274,10 @@ chmod +x "$INSTALL_DIR/scripts/reset-profile.sh" "$INSTALL_DIR/scripts/repair-br
 systemctl daemon-reload
 systemctl enable --now auto-facebook-agent-stack.target
 systemctl enable --now auto-facebook-agent-xvfb auto-facebook-agent-x11vnc auto-facebook-agent-websockify
-systemctl enable --now auto-facebook-agent
+systemctl enable auto-facebook-agent
+# restart (not just enable --now) so a RE-INSTALL/UPGRADE actually loads the new
+# code — `enable --now` is a no-op when the service is already running.
+systemctl restart auto-facebook-agent
 # auto-facebook-agent-login is NOT enabled by default — customer triggers it
 # from the cloud dashboard ("Open Facebook" button) which sends a command via
 # heartbeat → agent runs `sudo systemctl start auto-facebook-agent-login`.
