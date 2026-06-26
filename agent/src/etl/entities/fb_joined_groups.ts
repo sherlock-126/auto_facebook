@@ -51,10 +51,19 @@ export const fb_joined_groups: EntityConfig = {
   async run({ client, cfg, scope, mode }): Promise<EntityRunResult> {
     let cursor: string | null = null;
     let rows_seen = 0;
-    let rows_upserted = 0;
     let pages_scanned = 0;
+    let dupeStreak = 0;
     const seenIds = new Set<string>();
-    const MAX_PAGES = mode === 'full' ? 30 : 15;
+    const collected: Record<string, unknown>[] = [];
+    // incr runs every ~15min — keep it shallow (just catch groups joined recently,
+    // which surface near the top). The manual "Refresh groups list" (discover) and
+    // the nightly full sweep walk deep enough to enumerate the whole membership
+    // (166+ groups → ~9 pages at 20/page; allow generous headroom).
+    const MAX_PAGES = mode === 'incr' ? 3 : 40;
+    // The `integrity_signals` ordering is RANKED, not a stable list, so it re-emits
+    // already-seen groups on later pages. A single all-duplicate page is NOT the end
+    // of the list — only give up after several consecutive dupe pages (or no cursor).
+    const MAX_DUPE_STREAK = 3;
 
     while (pages_scanned < MAX_PAGES) {
       const variables: Record<string, unknown> = {
@@ -72,12 +81,17 @@ export const fb_joined_groups: EntityConfig = {
 
       const newOnPage = groups.filter((g) => !seenIds.has(g.group_id));
       for (const g of groups) seenIds.add(g.group_id);
-      if (newOnPage.length === 0) {
-        log('warn', `fb_joined_groups page ${pages_scanned} returned only seen group_ids — stopping`);
-        break;
-      }
 
-      rows_upserted += await uploadBatch(cfg, 'groups', newOnPage.map((g) => ({
+      if (newOnPage.length === 0) {
+        dupeStreak++;
+        log('warn', `fb_joined_groups page ${pages_scanned}: all ${groups.length} already seen (dupe streak ${dupeStreak}/${MAX_DUPE_STREAK})`);
+        if (dupeStreak >= MAX_DUPE_STREAK || !nextCursor) break;
+        cursor = nextCursor;
+        continue;
+      }
+      dupeStreak = 0;
+
+      for (const g of newOnPage) collected.push({
         group_id:   g.group_id,
         name:       g.name,
         url:        g.url,
@@ -85,11 +99,17 @@ export const fb_joined_groups: EntityConfig = {
         enabled:    false, // user must opt-in via UI to avoid blowing budget
         raw:        g.raw,
         updated_at: new Date().toISOString(),
-      })));
+      });
 
       if (!nextCursor) break;
       cursor = nextCursor;
     }
+
+    // Upload ONCE at the end: a single page's transient 502 must not truncate the
+    // whole walk (the old per-page upload aborted discovery on the first failure).
+    let rows_upserted = 0;
+    if (collected.length) rows_upserted = await uploadBatch(cfg, 'groups', collected);
+    log('info', `fb_joined_groups done: pages=${pages_scanned} seen=${rows_seen} unique=${seenIds.size} uploaded=${rows_upserted}`);
 
     return { entity: 'fb_joined_groups', scope, pages_scanned, rows_seen, rows_upserted };
   },

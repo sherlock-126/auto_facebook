@@ -59,12 +59,16 @@ export const fb_joined_groups: EntityConfig = {
   async run({ client, scope, mode }): Promise<EntityRunResult> {
     let cursor: string | null = null;
     let rows_seen = 0;
-    let rows_upserted = 0;
     let pages_scanned = 0;
+    let dupeStreak = 0;
     const seenIds = new Set<string>();
-    // Account-bound list — a few hundred at most. Allow up to 30 pages
-    // (~600 groups) in full mode, 15 (~300) in incr.
-    const MAX_PAGES = mode === 'full' ? 30 : 15;
+    const collected: Record<string, unknown>[] = [];
+    // incr keeps it shallow (catch recently-joined groups near the top); the manual
+    // refresh + nightly full walk deep enough for the whole membership (166+).
+    const MAX_PAGES = mode === 'incr' ? 3 : 40;
+    // `integrity_signals` is a RANKED ordering and re-emits already-seen groups on
+    // later pages — a single all-duplicate page is not the end of the list.
+    const MAX_DUPE_STREAK = 3;
 
     while (pages_scanned < MAX_PAGES) {
       const variables: Record<string, unknown> = {
@@ -82,31 +86,40 @@ export const fb_joined_groups: EntityConfig = {
 
       const newOnPage = groups.filter((g) => !seenIds.has(g.group_id));
       for (const g of groups) seenIds.add(g.group_id);
-      if (newOnPage.length === 0) {
-        console.warn(`[fb_joined_groups] page ${pages_scanned} returned only seen group_ids — stopping`);
-        break;
-      }
 
-      rows_upserted += await upsertBatch({
-        table: 'dim_group',
-        keyCols: ['tenant_id', 'group_id'],
-        // enabled=false on first insert — user must opt-in per group via UI to
-        // avoid blowing the 400 req/day budget on irrelevant groups.
-        // updateCols intentionally omits `enabled` so user toggles persist.
-        rows: newOnPage.map((g) => ({
-          group_id: g.group_id,
-          name: g.name,
-          url: g.url,
-          is_joined: true,
-          enabled: false,
-          raw: g.raw,
-          updated_at: new Date(),
-        })),
-        updateCols: ['name', 'url', 'is_joined', 'raw', 'updated_at'],
+      if (newOnPage.length === 0) {
+        dupeStreak++;
+        console.warn(`[fb_joined_groups] page ${pages_scanned}: all ${groups.length} already seen (dupe streak ${dupeStreak}/${MAX_DUPE_STREAK})`);
+        if (dupeStreak >= MAX_DUPE_STREAK || !nextCursor) break;
+        cursor = nextCursor;
+        continue;
+      }
+      dupeStreak = 0;
+
+      // enabled=false on first insert — user must opt-in per group via UI to avoid
+      // blowing the 400 req/day budget. (updateCols omits `enabled` so toggles persist.)
+      for (const g of newOnPage) collected.push({
+        group_id: g.group_id,
+        name: g.name,
+        url: g.url,
+        is_joined: true,
+        enabled: false,
+        raw: g.raw,
+        updated_at: new Date(),
       });
 
       if (!nextCursor) break;
       cursor = nextCursor;
+    }
+
+    let rows_upserted = 0;
+    if (collected.length) {
+      rows_upserted = await upsertBatch({
+        table: 'dim_group',
+        keyCols: ['tenant_id', 'group_id'],
+        rows: collected,
+        updateCols: ['name', 'url', 'is_joined', 'raw', 'updated_at'],
+      });
     }
 
     return { entity: 'fb_joined_groups', scope, pages_scanned, rows_seen, rows_upserted };

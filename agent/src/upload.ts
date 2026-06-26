@@ -45,7 +45,11 @@ export async function uploadBatch(
   if (rows.length === 0) return 0;
   const body = JSON.stringify({ entity, rows });
   let lastErr: any = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // 6 attempts with capped exponential backoff (~1+2+4+8+15 ≈ 30s of coverage) so a
+  // transient origin 502/503 — e.g. the cloud app restarting during a deploy — does
+  // not drop the whole batch. 5xx + network errors retry; 4xx bails immediately.
+  const MAX_ATTEMPTS = 6;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const res = await authedFetch(cfg, '/api/agent/upload', {
         method: 'POST',
@@ -65,9 +69,9 @@ export async function uploadBatch(
     } catch (e: any) {
       lastErr = e;
     }
-    if (attempt < 3) {
-      const backoff = 500 * Math.pow(2, attempt - 1);
-      log('warn', `upload retry ${attempt}`, { entity, err: lastErr?.message, sleep_ms: backoff });
+    if (attempt < MAX_ATTEMPTS) {
+      const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 15000);
+      log('warn', `upload retry ${attempt}/${MAX_ATTEMPTS}`, { entity, err: lastErr?.message, sleep_ms: backoff });
       await sleep(backoff);
     }
   }

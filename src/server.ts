@@ -130,6 +130,24 @@ app.patch<{ Params: { id: string }; Body: { enabled?: boolean } }>('/api/groups/
   return { ok: true };
 });
 
+// Bulk enable/disable — "Enable all" lets the user crawl every joined group in one
+// click instead of toggling 100+ groups by hand. is_joined guard avoids enabling
+// stale/left groups. enabled is the only column touched (preserves discovery data).
+app.post('/api/groups/enable-all', async (req) => {
+  const { rowCount } = await pool.query(
+    'UPDATE dim_group SET enabled = true, updated_at = now() WHERE tenant_id = $1 AND is_joined = true AND enabled = false',
+    [req.tenant_id!]
+  );
+  return { ok: true, updated: rowCount ?? 0 };
+});
+app.post('/api/groups/disable-all', async (req) => {
+  const { rowCount } = await pool.query(
+    'UPDATE dim_group SET enabled = false, updated_at = now() WHERE tenant_id = $1 AND enabled = true',
+    [req.tenant_id!]
+  );
+  return { ok: true, updated: rowCount ?? 0 };
+});
+
 /**
  * Manually add a group user has joined that FB's all_joined_groups API didn't
  * return (cache lag, private groups, pending-membership, etc). Accepts either
@@ -1756,11 +1774,11 @@ function renderApp(): string {
   <!-- GROUPS -->
   <div class="view hidden" data-view="groups">
     <div class="panel">
-      <h3>👥 Joined groups <span class="muted" style="font-weight:400; font-size:11px;">— "scrape on" = the scheduler crawls this group every 2 hours.</span></h3>
+      <h3>👥 Joined groups <span id="groupsTotalBadge" class="pill" style="font-weight:600; font-size:12px; vertical-align:middle;">…</span> <span class="muted" style="font-weight:400; font-size:11px;">— "scrape on" = the scheduler crawls this group every 2 hours.</span></h3>
       <div class="row-flex" style="margin-bottom:10px; padding:8px 10px; background:var(--bg-hover); border-radius:6px;">
         <span style="font-size:12px;">💡 To refresh groups after joining more on FB, go to the <strong>FB Login</strong> tab → click <strong>🔍 Refresh groups list</strong>. Turn ON the groups you want to crawl — the 30-min cron handles the rest.</span>
       </div>
-      <div id="newGroupsPanel" style="display:none; margin-bottom:10px; padding:10px 12px; background:#1f3f2a; border:1px solid #2a5a3b; border-radius:6px;">
+      <div id="newGroupsPanel" style="display:none; margin-bottom:10px; padding:10px 12px; background:#1f3f2a; border:1px solid #2a5a3b; border-radius:6px; color:#e6f7ee;">
         <div style="font-size:13px; margin-bottom:8px;">🆕 <strong>Newly discovered groups (last 24h)</strong> — click to enable + backfill</div>
         <div id="newGroupsList"></div>
       </div>
@@ -1772,6 +1790,8 @@ function renderApp(): string {
           <option value="off">not scraping</option>
         </select>
         <button class="secondary" id="groupsReload">↻ Reload</button>
+        <button class="success" id="groupsEnableAll" title="Turn ON crawling for every joined group. Respects the FB rate budget — if you have many groups the crawler works through them across days.">✅ Enable all</button>
+        <button class="secondary" id="groupsDisableAll" title="Turn OFF crawling for every group.">⏸ Disable all</button>
         <span class="spacer" style="flex:1"></span>
         <span class="muted" id="groupsCounter">…</span>
         <button class="secondary" id="groupsPrev">← prev</button>
@@ -2535,8 +2555,8 @@ async function loadNewGroups(){
   panel.style.display = 'block';
   $('newGroupsList').innerHTML = list.map(r =>
     '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #2a5a3b;">' +
-      '<span style="flex:1; font-size:13px;">' + esc(r.name || r.group_id) + '</span>' +
-      '<span class="muted" style="font-size:11px;">' + esc(fmtAgo(r.first_seen_at)) + ' ago</span>' +
+      '<span style="flex:1; font-size:13px; color:#e6f7ee;">' + esc(r.name || r.group_id) + '</span>' +
+      '<span style="font-size:11px; color:#a9d9bd;">' + esc(fmtAgo(r.first_seen_at)) + ' ago</span>' +
       '<button class="js-crawl-btn success" onclick="enableAndBackfill(\\'' + esc(r.group_id) + '\\', this)" style="white-space:nowrap;">🚀 Enable + Backfill</button>' +
     '</div>'
   ).join('');
@@ -2575,6 +2595,7 @@ async function loadGroups(){
   // counter + paging
   const t = g.totals ?? {}; const p = g.paging ?? {};
   $('groupsCounter').textContent = (t.enabled ?? 0) + ' / ' + (t.total ?? 0) + ' enabled · filter: ' + (p.total ?? 0) + ' results';
+  if ($('groupsTotalBadge')) $('groupsTotalBadge').textContent = (t.total ?? 0) + ' joined · ' + (t.enabled ?? 0) + ' crawling';
   const from = (p.total ?? 0) === 0 ? 0 : p.offset + 1;
   const to   = Math.min((p.total ?? 0), p.offset + p.limit);
   $('groupsPageInfo').textContent = from + '–' + to;
@@ -2594,6 +2615,18 @@ $('groupsPrev').onclick = () => { groupsState.offset = Math.max(0, groupsState.o
 $('groupsNext').onclick = () => { groupsState.offset += groupsState.limit; loadGroups(); };
 async function toggleGroup(id, v){ await fetch('/api/groups/' + id, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify({enabled: v}) }); loadGroups(); }
 window.toggleGroup = toggleGroup;
+$('groupsEnableAll') && ($('groupsEnableAll').onclick = async () => {
+  if (!confirm('Turn ON crawling for ALL joined groups?\\n\\nThe crawler respects the FB rate budget — with many groups it works through them across several days (it will not fail). You can disable specific groups afterward.')) return;
+  const r = await fetch('/api/groups/enable-all', { method:'POST', credentials:'same-origin' }).then(r=>r.json()).catch(()=>null);
+  if (r && r.ok) toast('✅ Enabled ' + r.updated + ' groups', 'success'); else toast('Error enabling groups', 'error');
+  loadGroups();
+});
+$('groupsDisableAll') && ($('groupsDisableAll').onclick = async () => {
+  if (!confirm('Turn OFF crawling for ALL groups?')) return;
+  const r = await fetch('/api/groups/disable-all', { method:'POST', credentials:'same-origin' }).then(r=>r.json()).catch(()=>null);
+  if (r && r.ok) toast('⏸ Disabled ' + r.updated + ' groups', 'success'); else toast('Error', 'error');
+  loadGroups();
+});
 
 // Disable all crawl-triggering buttons when agent has a run in-flight; shows
 // banner so user understands click is queued behind. Hooked from loadAgentStatus.
