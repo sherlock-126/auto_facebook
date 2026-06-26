@@ -93,7 +93,7 @@ app.get<{ Querystring: { q?: string; enabled?: 'on' | 'off' | 'all'; limit?: str
   const offset = Math.max(0, Number(req.query.offset ?? 0));
   const where: string[] = ['tenant_id = $1'];
   const params: unknown[] = [req.tenant_id!];
-  if (req.query.q) { params.push(`%${req.query.q}%`); where.push(`name ILIKE $${params.length}`); }
+  if (req.query.q) { params.push(`%${req.query.q}%`); where.push(`(name ILIKE $${params.length} OR url ILIKE $${params.length} OR group_id ILIKE $${params.length})`); }
   if (req.query.enabled === 'on')  where.push('enabled = TRUE');
   if (req.query.enabled === 'off') where.push('enabled = FALSE');
   const whereSql = `WHERE ${where.join(' AND ')}`;
@@ -1778,12 +1778,8 @@ function renderApp(): string {
       <div class="row-flex" style="margin-bottom:10px; padding:8px 10px; background:var(--bg-hover); border-radius:6px;">
         <span style="font-size:12px;">💡 To refresh groups after joining more on FB, go to the <strong>FB Login</strong> tab → click <strong>🔍 Refresh groups list</strong>. Turn ON the groups you want to crawl — the 30-min cron handles the rest.</span>
       </div>
-      <div id="newGroupsPanel" style="display:none; margin-bottom:10px; padding:10px 12px; background:#1f3f2a; border:1px solid #2a5a3b; border-radius:6px; color:#e6f7ee;">
-        <div style="font-size:13px; margin-bottom:8px;">🆕 <strong>Newly discovered groups (last 24h)</strong> — click to enable + backfill</div>
-        <div id="newGroupsList"></div>
-      </div>
       <div class="row-flex" style="margin-bottom:10px">
-        <input id="groupsQ" placeholder="search by group name…" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:5px 10px; font-size:12px; width:260px;" />
+        <input id="groupsQ" placeholder="search by name or group link…" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:5px 10px; font-size:12px; width:300px;" />
         <select id="groupsFilter" style="background:var(--bg-input); color:var(--text); border:1px solid var(--border-strong); border-radius:5px; padding:5px 10px; font-size:12px;">
           <option value="all">all</option>
           <option value="on">scraping</option>
@@ -2532,7 +2528,7 @@ window.viewCapture = viewCapture;
 window.closeDetail = closeDetail;
 
 // ── Groups
-const groupsState = { offset: 0, limit: 50 };
+const groupsState = { offset: 0, limit: 100 };
 async function loadRefreshInfo(){
   const j = await getJson('/api/groups/refresh-info');
   if (!j) return;
@@ -2546,33 +2542,8 @@ async function loadRefreshInfo(){
   }
 }
 
-async function loadNewGroups(){
-  const j = await getJson('/api/groups/new');
-  if (!j) return;
-  const list = j.rows ?? [];
-  const panel = $('newGroupsPanel');
-  if (list.length === 0) { panel.style.display = 'none'; return; }
-  panel.style.display = 'block';
-  $('newGroupsList').innerHTML = list.map(r =>
-    '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #2a5a3b;">' +
-      '<span style="flex:1; font-size:13px; color:#e6f7ee;">' + esc(r.name || r.group_id) + '</span>' +
-      '<span style="font-size:11px; color:#a9d9bd;">' + esc(fmtAgo(r.first_seen_at)) + ' ago</span>' +
-      '<button class="js-crawl-btn success" onclick="enableAndBackfill(\\'' + esc(r.group_id) + '\\', this)" style="white-space:nowrap;">🚀 Enable + Backfill</button>' +
-    '</div>'
-  ).join('');
-}
-async function enableAndBackfill(gid, btn){
-  // Phase B: cloud-side ETL is dead. Just enable the group; agent picks it up
-  // on next cron tick (or trigger discover_now from FB Login tab for immediate).
-  btn.disabled = true; btn.textContent = '⏳ enabling…';
-  await fetch('/api/groups/' + gid, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify({enabled: true}) });
-  toast('Enabled — the agent will crawl it on the next tick. Click "🔍 Refresh groups list" on the FB Login tab to crawl now.', 'success', 6000);
-  loadGroups();
-}
-window.enableAndBackfill = enableAndBackfill;
 async function loadGroups(){
   loadRefreshInfo();
-  loadNewGroups();
   const q = $('groupsQ').value.trim();
   const filter = $('groupsFilter').value;
   const params = new URLSearchParams({ limit: String(groupsState.limit), offset: String(groupsState.offset) });
