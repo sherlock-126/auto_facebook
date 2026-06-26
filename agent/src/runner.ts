@@ -24,7 +24,7 @@ const LOGIN_LOCK = '/var/lib/auto-facebook-agent/login.lock';
 // where the underlying page.evaluate() never returns. Without this, the whole
 // agent process blocks indefinitely — heartbeats stop, watchdog kicks in, but
 // we lose a full sweep cycle. With this, we skip the stuck group and proceed.
-const ENTITY_TIMEOUT_MS = Number(process.env.AGENT_ENTITY_TIMEOUT_MS ?? 180_000);
+const ENTITY_TIMEOUT_MS = Number(process.env.AGENT_ENTITY_TIMEOUT_MS ?? 300_000);
 
 class EntityTimeoutError extends Error {
   constructor(label: string, ms: number) {

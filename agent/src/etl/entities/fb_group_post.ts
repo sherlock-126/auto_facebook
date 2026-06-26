@@ -206,7 +206,11 @@ export const fb_group_post: EntityConfig = {
     let rows_seen = 0;
     let rows_upserted = 0;
     let newWatermark: Date | null = wm;
-    const MAX_PAGES = 60;
+    // incr (every 15min / "Run crawl now") = SHALLOW: just the newest posts, so a
+    // big group can't blow the per-entity timeout walking 60 pages at the safe
+    // 10-25s/request pacing (first crawl has no watermark to stop early). The
+    // nightly `full` sweep walks deep. 6 pages × ~20 posts = newest ~120 posts.
+    const MAX_PAGES = mode === 'incr' ? 6 : 60;
 
     while (pages_scanned < MAX_PAGES) {
       const res = await client.graphql({

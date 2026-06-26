@@ -230,7 +230,7 @@ export const fb_group_post: EntityConfig = {
     // page comes back entirely older than the watermark (with a 5-min overlap).
     // MAX_PAGES is just a safety bound for catastrophic cases (bad cursor,
     // stale watermark). 60 pages ≈ 180 posts is plenty for any normal 2h tick.
-    const MAX_PAGES = mode === 'full' ? 60 : 60;
+    const MAX_PAGES = mode === 'incr' ? 6 : 60;
 
     while (pages_scanned < MAX_PAGES) {
       const res = await client.graphql({
