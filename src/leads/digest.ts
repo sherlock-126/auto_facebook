@@ -126,8 +126,11 @@ async function buildTenantDigest(tenantId: string, kind: DigestKind): Promise<st
  * Eligible = has telegram_bot_token + chat_id AND the matching digest toggle is
  * not explicitly false (default on).
  */
-export async function sendDigests(kind: DigestKind, dryRun = false): Promise<{ sent: number; skipped: number; tenants: Array<{ tenant_id: string; status: string; preview?: string }> }> {
+export async function sendDigests(kind: DigestKind, dryRun = false, onlyTenant?: string): Promise<{ sent: number; skipped: number; tenants: Array<{ tenant_id: string; status: string; preview?: string }> }> {
   const toggle = kind === 'daily' ? 'digest_daily' : 'digest_weekly';
+  const params: any[] = [];
+  let tenantFilter = '';
+  if (onlyTenant) { params.push(onlyTenant); tenantFilter = ` AND tenant_id = $${params.length}`; }
   const { rows } = await pool.query(
     `SELECT tenant_id,
             config->>'telegram_bot_token' AS bot_token,
@@ -136,7 +139,8 @@ export async function sendDigests(kind: DigestKind, dryRun = false): Promise<{ s
             config->>'${toggle}'          AS toggle
        FROM tenant_settings
       WHERE config->>'telegram_bot_token' IS NOT NULL
-        AND config->>'telegram_chat_id'   IS NOT NULL`,
+        AND config->>'telegram_chat_id'   IS NOT NULL${tenantFilter}`,
+    params,
   );
 
   const out: Array<{ tenant_id: string; status: string; preview?: string }> = [];
