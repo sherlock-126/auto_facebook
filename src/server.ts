@@ -234,6 +234,16 @@ app.post('/api/ops/check-agent-health', async (req) => {
   return { ok: true, ...r };
 });
 
+// Lead digest (daily/weekly roll-up grouped by author) — triggered by scheduler.
+// Additive to per-lead alerts. Also reachable by an admin for a manual test send.
+app.post<{ Body?: { kind?: 'daily' | 'weekly'; dry_run?: boolean } }>('/api/ops/send-digest', async (req, reply) => {
+  if (req.role !== 'system' && !req.is_admin) return reply.status(403).send({ ok: false, error: 'forbidden' });
+  const kind = req.body?.kind === 'weekly' ? 'weekly' : 'daily';
+  const { sendDigests } = await import('./leads/digest.js');
+  const r = await sendDigests(kind, req.body?.dry_run === true);
+  return { ok: true, kind, ...r };
+});
+
 app.post<{ Body?: { mode?: 'incr' | 'full' } }>('/api/run/all', async (req, reply) => {
   const mode = req.body?.mode ?? 'incr';
   const tid = req.tenant_id;

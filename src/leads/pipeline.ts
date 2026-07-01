@@ -65,6 +65,11 @@ export interface TenantConfig {
   telegram_chat_title?: string | null;  // human-readable label, populated by /detect-chat
   telegram_topic_hr?: number | null;        // thread_id for HR/recruitment leads
   telegram_topic_fulfill?: number | null;   // thread_id for fulfill/supplier leads
+  telegram_topic_summary?: number | null;   // thread_id for the daily/weekly digest (null → General)
+  // Digest: a periodic roll-up of the day's / week's leads grouped by author,
+  // sent IN ADDITION to the per-lead alerts (does not replace them). Default on.
+  digest_daily?: boolean;                    // end-of-day summary (default true)
+  digest_weekly?: boolean;                   // end-of-week summary (default true)
   // Per-tenant random secret for the Telegram webhook URL + the secret_token
   // header. Generated automatically when bot_token is first saved.
   telegram_webhook_secret?: string | null;
@@ -108,6 +113,9 @@ const DEFAULT_CONFIG: TenantConfig = {
   telegram_chat_title: null,
   telegram_topic_hr: null,
   telegram_topic_fulfill: null,
+  telegram_topic_summary: null,
+  digest_daily: true,
+  digest_weekly: true,
   notify_intents: undefined,
   lead_rules: null,
   lead_min_confidence: 0,

@@ -59,7 +59,25 @@ async function triggerHealthCheck() {
 }
 cron.schedule(OPS_HEALTH, () => void triggerHealthCheck());
 
-console.log(`scheduler running (HTTP trigger -> ${BASE}/api/run/all): incr="${INCR}", full="${FULL}", ops-health="${OPS_HEALTH}"`);
+// Lead digest — daily end-of-day + weekly roll-up grouped by author, sent in
+// addition to per-lead alerts. Times are UTC; defaults = 21:00 VN daily and
+// 21:00 VN Sunday (VN = UTC+7 → 14:00 UTC).
+const DIGEST_DAILY  = process.env.CRON_DIGEST_DAILY  ?? '0 14 * * *';
+const DIGEST_WEEKLY = process.env.CRON_DIGEST_WEEKLY ?? '0 14 * * 0';
+async function triggerDigest(kind: 'daily' | 'weekly') {
+  try {
+    const res = await fetch(`${BASE}/api/ops/send-digest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${INTERNAL_TOKEN}` },
+      body: JSON.stringify({ kind }),
+    });
+    console.log(`[digest:${kind}] ${res.status} ${(await res.text()).slice(0, 200)}`);
+  } catch (e: any) { console.warn(`[digest:${kind}] failed: ${e?.message ?? e}`); }
+}
+cron.schedule(DIGEST_DAILY,  () => void triggerDigest('daily'));
+cron.schedule(DIGEST_WEEKLY, () => void triggerDigest('weekly'));
+
+console.log(`scheduler running (HTTP trigger -> ${BASE}/api/run/all): incr="${INCR}", full="${FULL}", ops-health="${OPS_HEALTH}", digest-daily="${DIGEST_DAILY}", digest-weekly="${DIGEST_WEEKLY}"`);
 
 let shuttingDown = false;
 function shutdown(sig: string) {
